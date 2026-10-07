@@ -1,46 +1,22 @@
 const { createApp } = Vue;
 
-
 createApp({
 
     data() {
         return {
-
-            // -------------------------------------------------
-            // APPLICATION STATE
-            // -------------------------------------------------
-
             currentPage: "login",
 
             loading: false,
-
             errorMessage: "",
-
             successMessage: "",
 
-
-            // -------------------------------------------------
-            // AUTHENTICATION
-            // -------------------------------------------------
-
             token: localStorage.getItem("access_token"),
-
             currentUser: null,
-
-
-            // -------------------------------------------------
-            // LOGIN FORM
-            // -------------------------------------------------
 
             loginForm: {
                 email: "",
                 password: ""
             },
-
-
-            // -------------------------------------------------
-            // REGISTER FORM
-            // -------------------------------------------------
 
             registerForm: {
                 name: "",
@@ -48,20 +24,97 @@ createApp({
                 phone: "",
                 password: "",
                 confirmPassword: ""
+            },
+
+            // =================================================
+            // ADMIN DASHBOARD
+            // =================================================
+
+            adminStats: {
+                total_treks: 0,
+                total_staff: 0,
+                total_trekkers: 0,
+                total_bookings: 0,
+                open_treks: 0,
+                completed_treks: 0
+            },
+
+            // =================================================
+            // TREKS
+            // =================================================
+
+            treks: [],
+
+            trekForm: {
+                id: null,
+                name: "",
+                location: "",
+                difficulty: "Easy",
+                duration: 1,
+                total_slots: 1,
+                description: "",
+                start_date: "",
+                end_date: "",
+                status: "Pending"
+            },
+
+            trekFormMode: "create",
+
+            // =================================================
+            // STAFF
+            // =================================================
+
+            staff: [],
+
+            staffForm: {
+                name: "",
+                email: "",
+                password: "",
+                phone: "",
+                experience: "",
+                specialization: "",
+                emergency_contact: "",
+                address: ""
+            },
+
+            assignForm: {
+                trek_id: "",
+                staff_id: ""
+            },
+
+            // =================================================
+            // USERS
+            // =================================================
+
+            users: [],
+
+            // =================================================
+            // BOOKINGS
+            // =================================================
+
+            bookings: [],
+
+            // =================================================
+            // SEARCH
+            // =================================================
+
+            searchQuery: "",
+
+            searchResults: {
+                treks: [],
+                users: [],
+                staff: []
             }
         };
     },
 
 
-    // =========================================================
-    // APP START
-    // =========================================================
-
     async mounted() {
 
         if (this.token) {
             await this.loadCurrentUser();
-        } else {
+        }
+        else {
             this.currentPage = "login";
         }
     },
@@ -70,31 +123,96 @@ createApp({
     methods: {
 
         // =====================================================
-        // COMMON MESSAGE RESET
+        // COMMON HELPERS
         // =====================================================
 
         clearMessages() {
-
             this.errorMessage = "";
             this.successMessage = "";
         },
 
 
+        async apiRequest(
+            url,
+            options = {}
+        ) {
+
+            const headers = {
+                ...(options.headers || {})
+            };
+
+            if (this.token) {
+                headers["Authorization"] =
+                    `Bearer ${this.token}`;
+            }
+
+            if (
+                options.body &&
+                !headers["Content-Type"]
+            ) {
+                headers["Content-Type"] =
+                    "application/json";
+            }
+
+            const response = await fetch(
+                url,
+                {
+                    ...options,
+                    headers
+                }
+            );
+
+            let data = {};
+
+            try {
+                data = await response.json();
+            }
+            catch (error) {
+                data = {};
+            }
+
+            if (response.status === 401) {
+
+                localStorage.removeItem(
+                    "access_token"
+                );
+
+                this.token = null;
+                this.currentUser = null;
+                this.currentPage = "login";
+
+                throw new Error(
+                    "Session expired. Please login again."
+                );
+            }
+
+            if (!response.ok) {
+
+                throw new Error(
+                    data.message ||
+                    `Request failed (${response.status})`
+                );
+            }
+
+            return data;
+        },
+
+
         // =====================================================
-        // LOGIN
+        // AUTHENTICATION
         // =====================================================
 
         async login() {
 
             this.clearMessages();
 
-            if (!this.loginForm.email) {
-                this.errorMessage = "Email is required.";
-                return;
-            }
+            if (
+                !this.loginForm.email ||
+                !this.loginForm.password
+            ) {
+                this.errorMessage =
+                    "Email and password are required.";
 
-            if (!this.loginForm.password) {
-                this.errorMessage = "Password is required.";
                 return;
             }
 
@@ -108,61 +226,49 @@ createApp({
                         method: "POST",
 
                         headers: {
-                            "Content-Type": "application/json"
+                            "Content-Type":
+                                "application/json"
                         },
 
                         body: JSON.stringify({
-                            email: this.loginForm.email,
-                            password: this.loginForm.password
+                            email:
+                                this.loginForm.email,
+
+                            password:
+                                this.loginForm.password
                         })
                     }
                 );
 
-
-                const data = await response.json();
-
+                const data =
+                    await response.json();
 
                 if (!response.ok) {
 
                     throw new Error(
-                        data.message || "Login failed"
+                        data.message ||
+                        "Login failed"
                     );
                 }
 
-
-                // ---------------------------------------------
-                // SAVE JWT
-                // ---------------------------------------------
-
-                this.token = data.access_token;
+                this.token =
+                    data.access_token;
 
                 localStorage.setItem(
                     "access_token",
                     this.token
                 );
 
+                this.currentUser =
+                    data.user;
 
-                // ---------------------------------------------
-                // SAVE USER
-                // ---------------------------------------------
-
-                this.currentUser = data.user;
-
-
-                // ---------------------------------------------
-                // REDIRECT ACCORDING TO ROLE
-                // ---------------------------------------------
-
-                this.redirectByRole();
-
-
-                this.successMessage =
-                    `Welcome ${data.user.name}`;
+                await this.redirectByRole();
 
             }
             catch (error) {
 
-                this.errorMessage = error.message;
+                this.errorMessage =
+                    error.message;
             }
             finally {
 
@@ -171,41 +277,21 @@ createApp({
         },
 
 
-        // =====================================================
-        // REGISTER TREKKER
-        // =====================================================
-
         async register() {
 
             this.clearMessages();
 
-
-            if (!this.registerForm.name) {
+            if (
+                !this.registerForm.name ||
+                !this.registerForm.email ||
+                !this.registerForm.password
+            ) {
 
                 this.errorMessage =
-                    "Name is required.";
+                    "Name, email and password are required.";
 
                 return;
             }
-
-
-            if (!this.registerForm.email) {
-
-                this.errorMessage =
-                    "Email is required.";
-
-                return;
-            }
-
-
-            if (!this.registerForm.password) {
-
-                this.errorMessage =
-                    "Password is required.";
-
-                return;
-            }
-
 
             if (
                 this.registerForm.password !==
@@ -218,8 +304,9 @@ createApp({
                 return;
             }
 
-
-            if (this.registerForm.password.length < 6) {
+            if (
+                this.registerForm.password.length < 6
+            ) {
 
                 this.errorMessage =
                     "Password must contain at least 6 characters.";
@@ -227,9 +314,7 @@ createApp({
                 return;
             }
 
-
             this.loading = true;
-
 
             try {
 
@@ -239,11 +324,11 @@ createApp({
                         method: "POST",
 
                         headers: {
-                            "Content-Type": "application/json"
+                            "Content-Type":
+                                "application/json"
                         },
 
                         body: JSON.stringify({
-
                             name:
                                 this.registerForm.name,
 
@@ -259,9 +344,8 @@ createApp({
                     }
                 );
 
-
-                const data = await response.json();
-
+                const data =
+                    await response.json();
 
                 if (!response.ok) {
 
@@ -271,11 +355,6 @@ createApp({
                     );
                 }
 
-
-                this.successMessage =
-                    "Registration successful. Please login.";
-
-
                 this.registerForm = {
                     name: "",
                     email: "",
@@ -284,8 +363,311 @@ createApp({
                     confirmPassword: ""
                 };
 
+                this.currentPage =
+                    "login";
 
+                this.successMessage =
+                    "Registration successful. Please login.";
+            }
+            catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+            finally {
+
+                this.loading = false;
+            }
+        },
+
+
+        async loadCurrentUser() {
+
+            try {
+
+                const data =
+                    await this.apiRequest(
+                        "/api/auth/me"
+                    );
+
+                this.currentUser =
+                    data.user;
+
+                await this.redirectByRole();
+            }
+            catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        async redirectByRole() {
+
+            if (!this.currentUser) {
                 this.currentPage = "login";
+                return;
+            }
+
+            if (
+                this.currentUser.role === "Admin"
+            ) {
+
+                this.currentPage =
+                    "admin-dashboard";
+
+                await this.loadAdminDashboard();
+            }
+
+            else if (
+                this.currentUser.role === "Staff"
+            ) {
+
+                this.currentPage =
+                    "staff-dashboard";
+            }
+
+            else if (
+                this.currentUser.role === "Trekker"
+            ) {
+
+                this.currentPage =
+                    "trekker-dashboard";
+            }
+        },
+
+
+        async logout() {
+
+            try {
+
+                if (this.token) {
+
+                    await this.apiRequest(
+                        "/api/auth/logout",
+                        {
+                            method: "POST"
+                        }
+                    );
+                }
+            }
+            catch (error) {
+                console.log(error);
+            }
+
+            localStorage.removeItem(
+                "access_token"
+            );
+
+            this.token = null;
+            this.currentUser = null;
+            this.currentPage = "login";
+
+            this.loginForm = {
+                email: "",
+                password: ""
+            };
+
+            this.clearMessages();
+        },
+
+
+        // =====================================================
+        // NAVIGATION
+        // =====================================================
+
+        async navigate(page) {
+
+            this.clearMessages();
+
+            this.currentPage = page;
+
+            if (page === "admin-dashboard") {
+                await this.loadAdminDashboard();
+            }
+
+            if (page === "admin-treks") {
+                await this.loadTreks();
+            }
+
+            if (page === "admin-staff") {
+                await this.loadStaff();
+                await this.loadTreks();
+            }
+
+            if (page === "admin-users") {
+                await this.loadUsers();
+            }
+
+            if (page === "admin-bookings") {
+                await this.loadBookings();
+            }
+        },
+
+
+        // =====================================================
+        // ADMIN DASHBOARD
+        // =====================================================
+
+        async loadAdminDashboard() {
+
+            try {
+
+                const data =
+                    await this.apiRequest(
+                        "/api/admin/dashboard"
+                    );
+
+                this.adminStats =
+                    data.stats;
+            }
+            catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        // =====================================================
+        // TREKS
+        // =====================================================
+
+        async loadTreks() {
+
+            try {
+
+                const data =
+                    await this.apiRequest(
+                        "/api/admin/treks"
+                    );
+
+                this.treks =
+                    data.treks;
+            }
+            catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        resetTrekForm() {
+
+            this.trekForm = {
+                id: null,
+                name: "",
+                location: "",
+                difficulty: "Easy",
+                duration: 1,
+                total_slots: 1,
+                description: "",
+                start_date: "",
+                end_date: "",
+                status: "Pending"
+            };
+
+            this.trekFormMode =
+                "create";
+        },
+
+
+        async saveTrek() {
+
+            this.clearMessages();
+
+            if (
+                !this.trekForm.name ||
+                !this.trekForm.location
+            ) {
+
+                this.errorMessage =
+                    "Trek name and location are required.";
+
+                return;
+            }
+
+            this.loading = true;
+
+            try {
+
+                const payload = {
+                    name:
+                        this.trekForm.name,
+
+                    location:
+                        this.trekForm.location,
+
+                    difficulty:
+                        this.trekForm.difficulty,
+
+                    duration:
+                        Number(
+                            this.trekForm.duration
+                        ),
+
+                    total_slots:
+                        Number(
+                            this.trekForm.total_slots
+                        ),
+
+                    description:
+                        this.trekForm.description,
+
+                    start_date:
+                        this.trekForm.start_date,
+
+                    end_date:
+                        this.trekForm.end_date,
+
+                    status:
+                        this.trekForm.status
+                };
+
+
+                if (
+                    this.trekFormMode ===
+                    "create"
+                ) {
+
+                    await this.apiRequest(
+                        "/api/admin/treks",
+                        {
+                            method: "POST",
+                            body:
+                                JSON.stringify(
+                                    payload
+                                )
+                        }
+                    );
+
+                    this.successMessage =
+                        "Trek created successfully.";
+                }
+
+                else {
+
+                    await this.apiRequest(
+                        `/api/admin/treks/${this.trekForm.id}`,
+                        {
+                            method: "PUT",
+                            body:
+                                JSON.stringify(
+                                    payload
+                                )
+                        }
+                    );
+
+                    this.successMessage =
+                        "Trek updated successfully.";
+                }
+
+                this.resetTrekForm();
+
+                await this.loadTreks();
+                await this.loadAdminDashboard();
 
             }
             catch (error) {
@@ -300,220 +682,391 @@ createApp({
         },
 
 
-        // =====================================================
-        // CURRENT USER
-        // =====================================================
+        editTrek(trek) {
 
-        async loadCurrentUser() {
+            this.clearMessages();
 
-            if (!this.token) {
+            this.trekFormMode =
+                "edit";
 
-                this.currentPage = "login";
+            this.trekForm = {
+                id: trek.id,
 
+                name:
+                    trek.name,
+
+                location:
+                    trek.location,
+
+                difficulty:
+                    trek.difficulty,
+
+                duration:
+                    trek.duration,
+
+                total_slots:
+                    trek.total_slots,
+
+                description:
+                    trek.description || "",
+
+                start_date:
+                    trek.start_date || "",
+
+                end_date:
+                    trek.end_date || "",
+
+                status:
+                    trek.status
+            };
+
+            window.scrollTo({
+                top: 0,
+                behavior: "smooth"
+            });
+        },
+
+
+        async deleteTrek(trek) {
+
+            const confirmed =
+                confirm(
+                    `Delete "${trek.name}"?`
+                );
+
+            if (!confirmed) {
                 return;
             }
 
+            this.clearMessages();
 
             try {
 
-                const response = await fetch(
-                    "/api/auth/me",
-                    {
-                        method: "GET",
-
-                        headers: {
-                            "Authorization":
-                                `Bearer ${this.token}`
-                        }
-                    }
-                );
-
-
-                if (!response.ok) {
-
-                    throw new Error(
-                        "Session expired"
-                    );
-                }
-
-
                 const data =
-                    await response.json();
+                    await this.apiRequest(
+                        `/api/admin/treks/${trek.id}`,
+                        {
+                            method: "DELETE"
+                        }
+                    );
 
+                this.successMessage =
+                    data.message;
 
-                this.currentUser =
-                    data.user;
-
-
-                this.redirectByRole();
+                await this.loadTreks();
+                await this.loadAdminDashboard();
 
             }
             catch (error) {
 
-                this.logout(false);
+                this.errorMessage =
+                    error.message;
             }
         },
 
 
         // =====================================================
-        // ROLE REDIRECTION
+        // STAFF
         // =====================================================
 
-        redirectByRole() {
+        async loadStaff() {
 
-            if (!this.currentUser) {
+            try {
 
-                this.currentPage = "login";
+                const data =
+                    await this.apiRequest(
+                        "/api/admin/staff"
+                    );
+
+                this.staff =
+                    data.staff;
+            }
+            catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        async createStaff() {
+
+            this.clearMessages();
+
+            if (
+                !this.staffForm.name ||
+                !this.staffForm.email ||
+                !this.staffForm.password
+            ) {
+
+                this.errorMessage =
+                    "Name, email and password are required.";
 
                 return;
             }
 
-
-            if (
-                this.currentUser.role === "Admin"
-            ) {
-
-                this.currentPage =
-                    "admin-dashboard";
-            }
-
-
-            else if (
-                this.currentUser.role === "Staff"
-            ) {
-
-                this.currentPage =
-                    "staff-dashboard";
-            }
-
-
-            else if (
-                this.currentUser.role === "Trekker"
-            ) {
-
-                this.currentPage =
-                    "trekker-dashboard";
-            }
-
-
-            else {
-
-                this.logout(false);
-            }
-        },
-
-
-        // =====================================================
-        // LOGOUT
-        // =====================================================
-
-        async logout(showMessage = true) {
-
             try {
 
-                if (this.token) {
-
-                    await fetch(
-                        "/api/auth/logout",
+                const data =
+                    await this.apiRequest(
+                        "/api/admin/staff",
                         {
                             method: "POST",
 
-                            headers: {
-                                "Authorization":
-                                    `Bearer ${this.token}`
-                            }
+                            body:
+                                JSON.stringify(
+                                    this.staffForm
+                                )
                         }
                     );
-                }
+
+                this.successMessage =
+                    data.message;
+
+                this.staffForm = {
+                    name: "",
+                    email: "",
+                    password: "",
+                    phone: "",
+                    experience: "",
+                    specialization: "",
+                    emergency_contact: "",
+                    address: ""
+                };
+
+                await this.loadStaff();
+                await this.loadAdminDashboard();
 
             }
             catch (error) {
 
-                console.error(
-                    "Logout API error:",
-                    error
-                );
-            }
-
-
-            localStorage.removeItem(
-                "access_token"
-            );
-
-
-            this.token = null;
-
-            this.currentUser = null;
-
-            this.currentPage = "login";
-
-
-            this.loginForm = {
-                email: "",
-                password: ""
-            };
-
-
-            this.clearMessages();
-
-
-            if (showMessage) {
-
-                this.successMessage =
-                    "Logout successful.";
+                this.errorMessage =
+                    error.message;
             }
         },
 
 
-        // =====================================================
-        // PAGE NAVIGATION
-        // =====================================================
-
-        navigate(page) {
+        async assignStaff() {
 
             this.clearMessages();
 
-            this.currentPage = page;
-        },
+            if (
+                !this.assignForm.trek_id ||
+                !this.assignForm.staff_id
+            ) {
 
+                this.errorMessage =
+                    "Select both trek and staff member.";
 
-        // =====================================================
-        // TEST PROTECTED ENDPOINT
-        // =====================================================
-
-        async testProtectedRoute() {
-
-            this.clearMessages();
-
+                return;
+            }
 
             try {
 
-                const response = await fetch(
-                    "/api/protected",
-                    {
-                        headers: {
-                            "Authorization":
-                                `Bearer ${this.token}`
+                const data =
+                    await this.apiRequest(
+                        `/api/admin/treks/${this.assignForm.trek_id}/assign-staff`,
+                        {
+                            method: "POST",
+
+                            body:
+                                JSON.stringify({
+                                    staff_id:
+                                        Number(
+                                            this.assignForm.staff_id
+                                        )
+                                })
                         }
+                    );
+
+                this.successMessage =
+                    data.message;
+
+                this.assignForm = {
+                    trek_id: "",
+                    staff_id: ""
+                };
+
+                await this.loadTreks();
+                await this.loadStaff();
+
+            }
+            catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        // =====================================================
+        // USERS
+        // =====================================================
+
+        async loadUsers() {
+
+            try {
+
+                const data =
+                    await this.apiRequest(
+                        "/api/admin/users"
+                    );
+
+                this.users =
+                    data.users;
+            }
+            catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        async setUserBlacklist(
+            user,
+            blacklisted
+        ) {
+
+            try {
+
+                await this.apiRequest(
+                    `/api/admin/users/${user.id}/status`,
+                    {
+                        method: "PATCH",
+
+                        body:
+                            JSON.stringify({
+                                is_active:
+                                    Boolean(
+                                        user.is_active
+                                    ),
+
+                                is_blacklisted:
+                                    blacklisted
+                            })
                     }
                 );
 
+                this.successMessage =
+                    blacklisted
+                    ? `${user.name} blacklisted.`
+                    : `${user.name} removed from blacklist.`;
 
-                const data =
-                    await response.json();
+                await this.loadUsers();
+
+            }
+            catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
 
 
-                if (!response.ok) {
+        async setUserActive(
+            user,
+            active
+        ) {
 
-                    throw new Error(
-                        data.message ||
-                        "Protected API failed"
-                    );
-                }
+            try {
 
+                await this.apiRequest(
+                    `/api/admin/users/${user.id}/status`,
+                    {
+                        method: "PATCH",
+
+                        body:
+                            JSON.stringify({
+                                is_active:
+                                    active,
+
+                                is_blacklisted:
+                                    Boolean(
+                                        user.is_blacklisted
+                                    )
+                            })
+                    }
+                );
 
                 this.successMessage =
-                    `${data.message} | Role: ${data.role}`;
+                    active
+                    ? `${user.name} activated.`
+                    : `${user.name} deactivated.`;
+
+                await this.loadUsers();
+
+            }
+            catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        // =====================================================
+        // BOOKINGS
+        // =====================================================
+
+        async loadBookings() {
+
+            try {
+
+                const data =
+                    await this.apiRequest(
+                        "/api/admin/bookings"
+                    );
+
+                this.bookings =
+                    data.bookings;
+            }
+            catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        // =====================================================
+        // SEARCH
+        // =====================================================
+
+        async performSearch() {
+
+            this.clearMessages();
+
+            if (!this.searchQuery.trim()) {
+
+                this.searchResults = {
+                    treks: [],
+                    users: [],
+                    staff: []
+                };
+
+                return;
+            }
+
+            try {
+
+                const data =
+                    await this.apiRequest(
+                        `/api/admin/search?q=${encodeURIComponent(
+                            this.searchQuery
+                        )}`
+                    );
+
+                this.searchResults = {
+                    treks:
+                        data.treks,
+
+                    users:
+                        data.users,
+
+                    staff:
+                        data.staff
+                };
 
             }
             catch (error) {
@@ -525,16 +1078,12 @@ createApp({
     },
 
 
-    // =========================================================
-    // TEMPLATE
-    // =========================================================
-
     template: `
 
     <div>
 
         <!-- ================================================= -->
-        <!-- LOGIN PAGE -->
+        <!-- LOGIN -->
         <!-- ================================================= -->
 
         <div
@@ -546,17 +1095,13 @@ createApp({
 
                 <div class="card-body p-4">
 
-                    <div class="text-center mb-4">
+                    <h2 class="fw-bold text-center">
+                        Trekking Management
+                    </h2>
 
-                        <h2 class="fw-bold">
-                            Trekking Management
-                        </h2>
-
-                        <p class="text-muted mb-0">
-                            Login to continue
-                        </p>
-
-                    </div>
+                    <p class="text-muted text-center">
+                        Login to continue
+                    </p>
 
 
                     <div
@@ -579,17 +1124,14 @@ createApp({
 
                         <div class="mb-3">
 
-                            <label
-                                class="form-label"
-                            >
+                            <label class="form-label">
                                 Email
                             </label>
 
                             <input
                                 v-model.trim="loginForm.email"
-                                type="email"
                                 class="form-control"
-                                placeholder="Enter email"
+                                type="email"
                             >
 
                         </div>
@@ -597,36 +1139,24 @@ createApp({
 
                         <div class="mb-3">
 
-                            <label
-                                class="form-label"
-                            >
+                            <label class="form-label">
                                 Password
                             </label>
 
                             <input
                                 v-model="loginForm.password"
-                                type="password"
                                 class="form-control"
-                                placeholder="Enter password"
+                                type="password"
                             >
 
                         </div>
 
 
                         <button
-                            type="submit"
                             class="btn btn-primary w-100"
                             :disabled="loading"
                         >
-
-                            <span v-if="loading">
-                                Logging in...
-                            </span>
-
-                            <span v-else>
-                                Login
-                            </span>
-
+                            {{ loading ? "Logging in..." : "Login" }}
                         </button>
 
                     </form>
@@ -635,18 +1165,18 @@ createApp({
                     <hr>
 
 
-                    <p class="text-center mb-0">
+                    <div class="text-center">
 
                         New Trekker?
 
                         <button
                             class="btn btn-link p-0"
-                            @click="navigate('register')"
+                            @click="currentPage='register'"
                         >
                             Create Account
                         </button>
 
-                    </p>
+                    </div>
 
                 </div>
 
@@ -657,7 +1187,7 @@ createApp({
 
 
         <!-- ================================================= -->
-        <!-- REGISTER PAGE -->
+        <!-- REGISTER -->
         <!-- ================================================= -->
 
         <div
@@ -673,10 +1203,6 @@ createApp({
                         Trekker Registration
                     </h2>
 
-                    <p class="text-muted text-center">
-                        Create your trekking account
-                    </p>
-
 
                     <div
                         v-if="errorMessage"
@@ -688,101 +1214,44 @@ createApp({
 
                     <form @submit.prevent="register">
 
+                        <input
+                            v-model.trim="registerForm.name"
+                            class="form-control mb-3"
+                            placeholder="Full Name"
+                        >
 
-                        <div class="mb-3">
+                        <input
+                            v-model.trim="registerForm.email"
+                            class="form-control mb-3"
+                            type="email"
+                            placeholder="Email"
+                        >
 
-                            <label class="form-label">
-                                Full Name
-                            </label>
+                        <input
+                            v-model.trim="registerForm.phone"
+                            class="form-control mb-3"
+                            placeholder="Phone"
+                        >
 
-                            <input
-                                v-model.trim="registerForm.name"
-                                type="text"
-                                class="form-control"
-                                placeholder="Enter full name"
-                            >
+                        <input
+                            v-model="registerForm.password"
+                            class="form-control mb-3"
+                            type="password"
+                            placeholder="Password"
+                        >
 
-                        </div>
-
-
-                        <div class="mb-3">
-
-                            <label class="form-label">
-                                Email
-                            </label>
-
-                            <input
-                                v-model.trim="registerForm.email"
-                                type="email"
-                                class="form-control"
-                                placeholder="Enter email"
-                            >
-
-                        </div>
-
-
-                        <div class="mb-3">
-
-                            <label class="form-label">
-                                Phone
-                            </label>
-
-                            <input
-                                v-model.trim="registerForm.phone"
-                                type="text"
-                                class="form-control"
-                                placeholder="Enter phone number"
-                            >
-
-                        </div>
-
-
-                        <div class="mb-3">
-
-                            <label class="form-label">
-                                Password
-                            </label>
-
-                            <input
-                                v-model="registerForm.password"
-                                type="password"
-                                class="form-control"
-                                placeholder="Minimum 6 characters"
-                            >
-
-                        </div>
-
-
-                        <div class="mb-3">
-
-                            <label class="form-label">
-                                Confirm Password
-                            </label>
-
-                            <input
-                                v-model="registerForm.confirmPassword"
-                                type="password"
-                                class="form-control"
-                                placeholder="Confirm password"
-                            >
-
-                        </div>
+                        <input
+                            v-model="registerForm.confirmPassword"
+                            class="form-control mb-3"
+                            type="password"
+                            placeholder="Confirm Password"
+                        >
 
 
                         <button
-                            type="submit"
                             class="btn btn-success w-100"
-                            :disabled="loading"
                         >
-
-                            <span v-if="loading">
-                                Creating account...
-                            </span>
-
-                            <span v-else>
-                                Register
-                            </span>
-
+                            Register
                         </button>
 
                     </form>
@@ -791,18 +1260,12 @@ createApp({
                     <hr>
 
 
-                    <p class="text-center mb-0">
-
-                        Already registered?
-
-                        <button
-                            class="btn btn-link p-0"
-                            @click="navigate('login')"
-                        >
-                            Login
-                        </button>
-
-                    </p>
+                    <button
+                        class="btn btn-link w-100"
+                        @click="currentPage='login'"
+                    >
+                        Back to Login
+                    </button>
 
                 </div>
 
@@ -813,56 +1276,36 @@ createApp({
 
 
         <!-- ================================================= -->
-        <!-- AUTHENTICATED APPLICATION -->
+        <!-- LOGGED-IN APPLICATION -->
         <!-- ================================================= -->
 
-        <div
-            v-else
-            class="app-container"
-        >
+        <div v-else>
 
-            <!-- NAVBAR -->
+            <nav class="navbar navbar-dark bg-dark px-3">
 
-            <nav
-                class="navbar navbar-dark bg-dark app-navbar"
-            >
+                <span class="navbar-brand fw-bold">
+                    Trekking Management V2
+                </span>
 
-                <div class="container-fluid">
 
-                    <span
-                        class="navbar-brand fw-bold"
-                    >
-                        Trekking Management
+                <div class="text-light">
+
+                    <span v-if="currentUser">
+                        {{ currentUser.name }}
+                        |
+                        {{ currentUser.role }}
                     </span>
 
-
-                    <div
-                        class="d-flex align-items-center gap-3"
+                    <button
+                        class="btn btn-outline-light btn-sm ms-3"
+                        @click="logout"
                     >
-
-                        <span
-                            v-if="currentUser"
-                            class="text-light"
-                        >
-                            {{ currentUser.name }}
-                            |
-                            {{ currentUser.role }}
-                        </span>
-
-
-                        <button
-                            class="btn btn-outline-light btn-sm"
-                            @click="logout()"
-                        >
-                            Logout
-                        </button>
-
-                    </div>
+                        Logout
+                    </button>
 
                 </div>
 
             </nav>
-
 
 
             <div class="container-fluid">
@@ -880,72 +1323,63 @@ createApp({
                         class="col-md-2 sidebar p-3"
                     >
 
-                        <h6
-                            class="text-light mb-3"
-                        >
-                            ADMIN
+                        <h6 class="text-white mb-3">
+                            ADMIN PANEL
                         </h6>
 
 
-                        <nav class="nav flex-column">
-
-                            <button
-                                class="nav-link text-start"
-                                :class="{
-                                    active:
-                                    currentPage ===
-                                    'admin-dashboard'
-                                }"
-                                @click="
-                                    navigate(
-                                        'admin-dashboard'
-                                    )
-                                "
-                            >
-                                Dashboard
-                            </button>
+                        <button
+                            class="nav-link text-start"
+                            :class="{active:currentPage==='admin-dashboard'}"
+                            @click="navigate('admin-dashboard')"
+                        >
+                            Dashboard
+                        </button>
 
 
-                            <button
-                                class="nav-link text-start"
-                                disabled
-                            >
-                                Manage Treks
-                            </button>
+                        <button
+                            class="nav-link text-start"
+                            :class="{active:currentPage==='admin-treks'}"
+                            @click="navigate('admin-treks')"
+                        >
+                            Manage Treks
+                        </button>
 
 
-                            <button
-                                class="nav-link text-start"
-                                disabled
-                            >
-                                Trek Staff
-                            </button>
+                        <button
+                            class="nav-link text-start"
+                            :class="{active:currentPage==='admin-staff'}"
+                            @click="navigate('admin-staff')"
+                        >
+                            Trek Staff
+                        </button>
 
 
-                            <button
-                                class="nav-link text-start"
-                                disabled
-                            >
-                                Users
-                            </button>
+                        <button
+                            class="nav-link text-start"
+                            :class="{active:currentPage==='admin-users'}"
+                            @click="navigate('admin-users')"
+                        >
+                            Users
+                        </button>
 
 
-                            <button
-                                class="nav-link text-start"
-                                disabled
-                            >
-                                Bookings
-                            </button>
+                        <button
+                            class="nav-link text-start"
+                            :class="{active:currentPage==='admin-bookings'}"
+                            @click="navigate('admin-bookings')"
+                        >
+                            Bookings
+                        </button>
 
 
-                            <button
-                                class="nav-link text-start"
-                                disabled
-                            >
-                                Reports
-                            </button>
-
-                        </nav>
+                        <button
+                            class="nav-link text-start"
+                            :class="{active:currentPage==='admin-search'}"
+                            @click="navigate('admin-search')"
+                        >
+                            Search
+                        </button>
 
                     </aside>
 
@@ -961,44 +1395,15 @@ createApp({
                         class="col-md-2 sidebar p-3"
                     >
 
-                        <h6 class="text-light mb-3">
+                        <h6 class="text-white">
                             TREK STAFF
                         </h6>
 
-
-                        <nav class="nav flex-column">
-
-                            <button
-                                class="nav-link active text-start"
-                            >
-                                Dashboard
-                            </button>
-
-
-                            <button
-                                class="nav-link text-start"
-                                disabled
-                            >
-                                My Treks
-                            </button>
-
-
-                            <button
-                                class="nav-link text-start"
-                                disabled
-                            >
-                                Participants
-                            </button>
-
-
-                            <button
-                                class="nav-link text-start"
-                                disabled
-                            >
-                                Profile
-                            </button>
-
-                        </nav>
+                        <button
+                            class="nav-link active text-start"
+                        >
+                            Dashboard
+                        </button>
 
                     </aside>
 
@@ -1014,65 +1419,25 @@ createApp({
                         class="col-md-2 sidebar p-3"
                     >
 
-                        <h6 class="text-light mb-3">
+                        <h6 class="text-white">
                             TREKKER
                         </h6>
 
-
-                        <nav class="nav flex-column">
-
-                            <button
-                                class="nav-link active text-start"
-                            >
-                                Dashboard
-                            </button>
-
-
-                            <button
-                                class="nav-link text-start"
-                                disabled
-                            >
-                                Browse Treks
-                            </button>
-
-
-                            <button
-                                class="nav-link text-start"
-                                disabled
-                            >
-                                My Bookings
-                            </button>
-
-
-                            <button
-                                class="nav-link text-start"
-                                disabled
-                            >
-                                History
-                            </button>
-
-
-                            <button
-                                class="nav-link text-start"
-                                disabled
-                            >
-                                Profile
-                            </button>
-
-                        </nav>
+                        <button
+                            class="nav-link active text-start"
+                        >
+                            Dashboard
+                        </button>
 
                     </aside>
 
 
 
                     <!-- ===================================== -->
-                    <!-- MAIN CONTENT -->
+                    <!-- MAIN -->
                     <!-- ===================================== -->
 
-                    <main
-                        class="col-md-10 main-content"
-                    >
-
+                    <main class="col-md-10 main-content">
 
                         <div
                             v-if="errorMessage"
@@ -1096,68 +1461,541 @@ createApp({
                         <!-- ================================ -->
 
                         <div
-                            v-if="
-                                currentPage ===
-                                'admin-dashboard'
-                            "
+                            v-if="currentPage==='admin-dashboard'"
                         >
 
-                            <h2 class="fw-bold">
+                            <h2 class="fw-bold mb-4">
                                 Admin Dashboard
                             </h2>
 
-                            <p class="text-muted">
-                                Welcome to administrator dashboard.
-                            </p>
 
+                            <div class="row g-3">
 
-                            <div class="row g-4 mt-2">
+                                <div class="col-md-4 col-lg-2">
+                                    <div class="card dashboard-card">
+                                        <div class="card-body text-center">
 
+                                            <h3>
+                                                {{ adminStats.total_treks }}
+                                            </h3>
 
-                                <div class="col-md-4">
-
-                                    <div
-                                        class="card dashboard-card"
-                                    >
-
-                                        <div class="card-body">
-
-                                            <h5>
-                                                Authentication
-                                            </h5>
-
-                                            <p class="text-muted">
-                                                JWT authentication active
-                                            </p>
-
-                                            <span
-                                                class="badge bg-success"
-                                            >
-                                                Working
+                                            <span class="text-muted">
+                                                Total Treks
                                             </span>
 
                                         </div>
-
                                     </div>
-
                                 </div>
 
 
-                                <div class="col-md-4">
+                                <div class="col-md-4 col-lg-2">
+                                    <div class="card dashboard-card">
+                                        <div class="card-body text-center">
 
-                                    <div
-                                        class="card dashboard-card"
-                                    >
+                                            <h3>
+                                                {{ adminStats.total_staff }}
+                                            </h3>
+
+                                            <span class="text-muted">
+                                                Staff
+                                            </span>
+
+                                        </div>
+                                    </div>
+                                </div>
+
+
+                                <div class="col-md-4 col-lg-2">
+                                    <div class="card dashboard-card">
+                                        <div class="card-body text-center">
+
+                                            <h3>
+                                                {{ adminStats.total_trekkers }}
+                                            </h3>
+
+                                            <span class="text-muted">
+                                                Trekkers
+                                            </span>
+
+                                        </div>
+                                    </div>
+                                </div>
+
+
+                                <div class="col-md-4 col-lg-2">
+                                    <div class="card dashboard-card">
+                                        <div class="card-body text-center">
+
+                                            <h3>
+                                                {{ adminStats.total_bookings }}
+                                            </h3>
+
+                                            <span class="text-muted">
+                                                Bookings
+                                            </span>
+
+                                        </div>
+                                    </div>
+                                </div>
+
+
+                                <div class="col-md-4 col-lg-2">
+                                    <div class="card dashboard-card">
+                                        <div class="card-body text-center">
+
+                                            <h3>
+                                                {{ adminStats.open_treks }}
+                                            </h3>
+
+                                            <span class="text-muted">
+                                                Open
+                                            </span>
+
+                                        </div>
+                                    </div>
+                                </div>
+
+
+                                <div class="col-md-4 col-lg-2">
+                                    <div class="card dashboard-card">
+                                        <div class="card-body text-center">
+
+                                            <h3>
+                                                {{ adminStats.completed_treks }}
+                                            </h3>
+
+                                            <span class="text-muted">
+                                                Completed
+                                            </span>
+
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- ================================ -->
+                        <!-- MANAGE TREKS -->
+                        <!-- ================================ -->
+
+                        <div
+                            v-else-if="currentPage==='admin-treks'"
+                        >
+
+                            <h2 class="fw-bold">
+                                Manage Treks
+                            </h2>
+
+
+                            <div class="card dashboard-card my-4">
+
+                                <div class="card-body">
+
+                                    <h5>
+                                        {{ trekFormMode === 'create'
+                                            ? 'Create New Trek'
+                                            : 'Edit Trek' }}
+                                    </h5>
+
+
+                                    <form @submit.prevent="saveTrek">
+
+                                        <div class="row g-3">
+
+                                            <div class="col-md-6">
+                                                <label class="form-label">
+                                                    Trek Name
+                                                </label>
+
+                                                <input
+                                                    v-model.trim="trekForm.name"
+                                                    class="form-control"
+                                                >
+                                            </div>
+
+
+                                            <div class="col-md-6">
+                                                <label class="form-label">
+                                                    Location
+                                                </label>
+
+                                                <input
+                                                    v-model.trim="trekForm.location"
+                                                    class="form-control"
+                                                >
+                                            </div>
+
+
+                                            <div class="col-md-4">
+
+                                                <label class="form-label">
+                                                    Difficulty
+                                                </label>
+
+                                                <select
+                                                    v-model="trekForm.difficulty"
+                                                    class="form-select"
+                                                >
+                                                    <option>Easy</option>
+                                                    <option>Moderate</option>
+                                                    <option>Hard</option>
+                                                </select>
+
+                                            </div>
+
+
+                                            <div class="col-md-4">
+
+                                                <label class="form-label">
+                                                    Duration (Days)
+                                                </label>
+
+                                                <input
+                                                    v-model.number="trekForm.duration"
+                                                    class="form-control"
+                                                    type="number"
+                                                    min="1"
+                                                >
+
+                                            </div>
+
+
+                                            <div class="col-md-4">
+
+                                                <label class="form-label">
+                                                    Total Slots
+                                                </label>
+
+                                                <input
+                                                    v-model.number="trekForm.total_slots"
+                                                    class="form-control"
+                                                    type="number"
+                                                    min="1"
+                                                >
+
+                                            </div>
+
+
+                                            <div class="col-md-4">
+
+                                                <label class="form-label">
+                                                    Start Date
+                                                </label>
+
+                                                <input
+                                                    v-model="trekForm.start_date"
+                                                    class="form-control"
+                                                    type="date"
+                                                >
+
+                                            </div>
+
+
+                                            <div class="col-md-4">
+
+                                                <label class="form-label">
+                                                    End Date
+                                                </label>
+
+                                                <input
+                                                    v-model="trekForm.end_date"
+                                                    class="form-control"
+                                                    type="date"
+                                                >
+
+                                            </div>
+
+
+                                            <div class="col-md-4">
+
+                                                <label class="form-label">
+                                                    Status
+                                                </label>
+
+                                                <select
+                                                    v-model="trekForm.status"
+                                                    class="form-select"
+                                                >
+                                                    <option>Pending</option>
+                                                    <option>Approved</option>
+                                                    <option>Open</option>
+                                                    <option>Closed</option>
+                                                    <option>Completed</option>
+                                                </select>
+
+                                            </div>
+
+
+                                            <div class="col-12">
+
+                                                <label class="form-label">
+                                                    Description
+                                                </label>
+
+                                                <textarea
+                                                    v-model.trim="trekForm.description"
+                                                    class="form-control"
+                                                    rows="3"
+                                                ></textarea>
+
+                                            </div>
+
+
+                                            <div class="col-12">
+
+                                                <button
+                                                    class="btn btn-primary"
+                                                >
+                                                    {{ trekFormMode === 'create'
+                                                        ? 'Create Trek'
+                                                        : 'Save Changes' }}
+                                                </button>
+
+
+                                                <button
+                                                    v-if="trekFormMode==='edit'"
+                                                    type="button"
+                                                    class="btn btn-secondary ms-2"
+                                                    @click="resetTrekForm"
+                                                >
+                                                    Cancel Edit
+                                                </button>
+
+                                            </div>
+
+                                        </div>
+
+                                    </form>
+
+                                </div>
+
+                            </div>
+
+
+                            <div class="table-responsive table-container">
+
+                                <table class="table table-hover align-middle">
+
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Trek</th>
+                                            <th>Location</th>
+                                            <th>Difficulty</th>
+                                            <th>Slots</th>
+                                            <th>Staff</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+
+
+                                    <tbody>
+
+                                        <tr
+                                            v-for="trek in treks"
+                                            :key="trek.id"
+                                        >
+
+                                            <td>
+                                                {{ trek.id }}
+                                            </td>
+
+                                            <td>
+                                                {{ trek.name }}
+                                            </td>
+
+                                            <td>
+                                                {{ trek.location }}
+                                            </td>
+
+                                            <td>
+                                                {{ trek.difficulty }}
+                                            </td>
+
+                                            <td>
+                                                {{ trek.available_slots }}
+                                                /
+                                                {{ trek.total_slots }}
+                                            </td>
+
+                                            <td>
+                                                {{ trek.assigned_staff || 'Not Assigned' }}
+                                            </td>
+
+                                            <td>
+                                                <span
+                                                    class="badge bg-secondary"
+                                                >
+                                                    {{ trek.status }}
+                                                </span>
+                                            </td>
+
+                                            <td>
+
+                                                <button
+                                                    class="btn btn-warning btn-sm me-2"
+                                                    @click="editTrek(trek)"
+                                                >
+                                                    Edit
+                                                </button>
+
+                                                <button
+                                                    class="btn btn-danger btn-sm"
+                                                    @click="deleteTrek(trek)"
+                                                >
+                                                    Delete
+                                                </button>
+
+                                            </td>
+
+                                        </tr>
+
+
+                                        <tr v-if="treks.length===0">
+
+                                            <td
+                                                colspan="8"
+                                                class="text-center text-muted"
+                                            >
+                                                No treks found.
+                                            </td>
+
+                                        </tr>
+
+                                    </tbody>
+
+                                </table>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- ================================ -->
+                        <!-- STAFF -->
+                        <!-- ================================ -->
+
+                        <div
+                            v-else-if="currentPage==='admin-staff'"
+                        >
+
+                            <h2 class="fw-bold">
+                                Trek Staff
+                            </h2>
+
+
+                            <div class="row g-4 my-3">
+
+                                <div class="col-lg-7">
+
+                                    <div class="card dashboard-card">
 
                                         <div class="card-body">
 
                                             <h5>
-                                                Role
+                                                Create Staff
                                             </h5>
 
-                                            <h3>
-                                                Admin
-                                            </h3>
+
+                                            <form
+                                                @submit.prevent="createStaff"
+                                            >
+
+                                                <div class="row g-3">
+
+                                                    <div class="col-md-6">
+                                                        <input
+                                                            v-model.trim="staffForm.name"
+                                                            class="form-control"
+                                                            placeholder="Name"
+                                                        >
+                                                    </div>
+
+
+                                                    <div class="col-md-6">
+                                                        <input
+                                                            v-model.trim="staffForm.email"
+                                                            class="form-control"
+                                                            type="email"
+                                                            placeholder="Email"
+                                                        >
+                                                    </div>
+
+
+                                                    <div class="col-md-6">
+                                                        <input
+                                                            v-model="staffForm.password"
+                                                            class="form-control"
+                                                            type="password"
+                                                            placeholder="Password"
+                                                        >
+                                                    </div>
+
+
+                                                    <div class="col-md-6">
+                                                        <input
+                                                            v-model.trim="staffForm.phone"
+                                                            class="form-control"
+                                                            placeholder="Phone"
+                                                        >
+                                                    </div>
+
+
+                                                    <div class="col-md-6">
+                                                        <input
+                                                            v-model.trim="staffForm.experience"
+                                                            class="form-control"
+                                                            placeholder="Experience"
+                                                        >
+                                                    </div>
+
+
+                                                    <div class="col-md-6">
+                                                        <input
+                                                            v-model.trim="staffForm.specialization"
+                                                            class="form-control"
+                                                            placeholder="Specialization"
+                                                        >
+                                                    </div>
+
+
+                                                    <div class="col-md-6">
+                                                        <input
+                                                            v-model.trim="staffForm.emergency_contact"
+                                                            class="form-control"
+                                                            placeholder="Emergency Contact"
+                                                        >
+                                                    </div>
+
+
+                                                    <div class="col-md-6">
+                                                        <input
+                                                            v-model.trim="staffForm.address"
+                                                            class="form-control"
+                                                            placeholder="Address"
+                                                        >
+                                                    </div>
+
+
+                                                    <div class="col-12">
+
+                                                        <button
+                                                            class="btn btn-success"
+                                                        >
+                                                            Create Staff
+                                                        </button>
+
+                                                    </div>
+
+                                                </div>
+
+                                            </form>
 
                                         </div>
 
@@ -1166,21 +2004,63 @@ createApp({
                                 </div>
 
 
-                                <div class="col-md-4">
+                                <div class="col-lg-5">
 
-                                    <div
-                                        class="card dashboard-card"
-                                    >
+                                    <div class="card dashboard-card">
 
                                         <div class="card-body">
 
                                             <h5>
-                                                Account
+                                                Assign Staff
                                             </h5>
 
-                                            <p class="mb-0">
-                                                {{ currentUser.email }}
-                                            </p>
+
+                                            <select
+                                                v-model="assignForm.trek_id"
+                                                class="form-select mb-3"
+                                            >
+
+                                                <option value="">
+                                                    Select Trek
+                                                </option>
+
+                                                <option
+                                                    v-for="trek in treks"
+                                                    :key="trek.id"
+                                                    :value="trek.id"
+                                                >
+                                                    {{ trek.name }}
+                                                </option>
+
+                                            </select>
+
+
+                                            <select
+                                                v-model="assignForm.staff_id"
+                                                class="form-select mb-3"
+                                            >
+
+                                                <option value="">
+                                                    Select Staff
+                                                </option>
+
+                                                <option
+                                                    v-for="person in staff"
+                                                    :key="person.id"
+                                                    :value="person.id"
+                                                >
+                                                    {{ person.name }}
+                                                </option>
+
+                                            </select>
+
+
+                                            <button
+                                                class="btn btn-primary"
+                                                @click="assignStaff"
+                                            >
+                                                Assign Staff
+                                            </button>
 
                                         </div>
 
@@ -1191,111 +2071,423 @@ createApp({
                             </div>
 
 
-                            <button
-                                class="btn btn-primary mt-4"
-                                @click="testProtectedRoute"
-                            >
-                                Test Protected API
-                            </button>
+                            <div class="table-responsive table-container">
+
+                                <table class="table">
+
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Name</th>
+                                            <th>Email</th>
+                                            <th>Phone</th>
+                                            <th>Specialization</th>
+                                            <th>Assigned Treks</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+
+
+                                    <tbody>
+
+                                        <tr
+                                            v-for="person in staff"
+                                            :key="person.id"
+                                        >
+
+                                            <td>
+                                                {{ person.id }}
+                                            </td>
+
+                                            <td>
+                                                {{ person.name }}
+                                            </td>
+
+                                            <td>
+                                                {{ person.email }}
+                                            </td>
+
+                                            <td>
+                                                {{ person.phone || '-' }}
+                                            </td>
+
+                                            <td>
+                                                {{ person.specialization || '-' }}
+                                            </td>
+
+                                            <td>
+                                                {{ person.assigned_treks }}
+                                            </td>
+
+                                            <td>
+
+                                                <span
+                                                    v-if="person.is_blacklisted"
+                                                    class="badge bg-danger"
+                                                >
+                                                    Blacklisted
+                                                </span>
+
+                                                <span
+                                                    v-else-if="person.is_active"
+                                                    class="badge bg-success"
+                                                >
+                                                    Active
+                                                </span>
+
+                                                <span
+                                                    v-else
+                                                    class="badge bg-secondary"
+                                                >
+                                                    Inactive
+                                                </span>
+
+                                            </td>
+
+                                        </tr>
+
+                                    </tbody>
+
+                                </table>
+
+                            </div>
 
                         </div>
 
 
 
                         <!-- ================================ -->
-                        <!-- STAFF DASHBOARD -->
+                        <!-- USERS -->
                         <!-- ================================ -->
 
                         <div
-                            v-else-if="
-                                currentPage ===
-                                'staff-dashboard'
-                            "
+                            v-else-if="currentPage==='admin-users'"
+                        >
+
+                            <h2 class="fw-bold mb-4">
+                                Manage Users
+                            </h2>
+
+
+                            <div class="table-responsive table-container">
+
+                                <table class="table table-hover">
+
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Name</th>
+                                            <th>Role</th>
+                                            <th>Email</th>
+                                            <th>Active</th>
+                                            <th>Blacklist</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+
+
+                                    <tbody>
+
+                                        <tr
+                                            v-for="user in users"
+                                            :key="user.id"
+                                        >
+
+                                            <td>
+                                                {{ user.id }}
+                                            </td>
+
+                                            <td>
+                                                {{ user.name }}
+                                            </td>
+
+                                            <td>
+                                                {{ user.role }}
+                                            </td>
+
+                                            <td>
+                                                {{ user.email }}
+                                            </td>
+
+                                            <td>
+                                                {{ user.is_active ? 'Yes' : 'No' }}
+                                            </td>
+
+                                            <td>
+                                                {{ user.is_blacklisted ? 'Yes' : 'No' }}
+                                            </td>
+
+                                            <td>
+
+                                                <button
+                                                    v-if="user.is_active"
+                                                    class="btn btn-secondary btn-sm me-1"
+                                                    @click="setUserActive(user,false)"
+                                                >
+                                                    Deactivate
+                                                </button>
+
+                                                <button
+                                                    v-else
+                                                    class="btn btn-success btn-sm me-1"
+                                                    @click="setUserActive(user,true)"
+                                                >
+                                                    Activate
+                                                </button>
+
+
+                                                <button
+                                                    v-if="!user.is_blacklisted"
+                                                    class="btn btn-danger btn-sm"
+                                                    @click="setUserBlacklist(user,true)"
+                                                >
+                                                    Blacklist
+                                                </button>
+
+                                                <button
+                                                    v-else
+                                                    class="btn btn-warning btn-sm"
+                                                    @click="setUserBlacklist(user,false)"
+                                                >
+                                                    Remove Blacklist
+                                                </button>
+
+                                            </td>
+
+                                        </tr>
+
+                                    </tbody>
+
+                                </table>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- ================================ -->
+                        <!-- BOOKINGS -->
+                        <!-- ================================ -->
+
+                        <div
+                            v-else-if="currentPage==='admin-bookings'"
+                        >
+
+                            <h2 class="fw-bold mb-4">
+                                All Bookings
+                            </h2>
+
+
+                            <div class="table-responsive table-container">
+
+                                <table class="table">
+
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>User</th>
+                                            <th>Trek</th>
+                                            <th>Date</th>
+                                            <th>Booking Status</th>
+                                            <th>Payment</th>
+                                        </tr>
+                                    </thead>
+
+
+                                    <tbody>
+
+                                        <tr
+                                            v-for="booking in bookings"
+                                            :key="booking.id"
+                                        >
+
+                                            <td>
+                                                {{ booking.id }}
+                                            </td>
+
+                                            <td>
+                                                {{ booking.user_name }}
+                                            </td>
+
+                                            <td>
+                                                {{ booking.trek_name }}
+                                            </td>
+
+                                            <td>
+                                                {{ booking.booking_date }}
+                                            </td>
+
+                                            <td>
+                                                {{ booking.status }}
+                                            </td>
+
+                                            <td>
+                                                {{ booking.payment_status }}
+                                            </td>
+
+                                        </tr>
+
+
+                                        <tr v-if="bookings.length===0">
+
+                                            <td
+                                                colspan="6"
+                                                class="text-center text-muted"
+                                            >
+                                                No bookings yet.
+                                            </td>
+
+                                        </tr>
+
+                                    </tbody>
+
+                                </table>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- ================================ -->
+                        <!-- SEARCH -->
+                        <!-- ================================ -->
+
+                        <div
+                            v-else-if="currentPage==='admin-search'"
                         >
 
                             <h2 class="fw-bold">
+                                Search
+                            </h2>
+
+
+                            <div class="input-group my-4">
+
+                                <input
+                                    v-model.trim="searchQuery"
+                                    @keyup.enter="performSearch"
+                                    class="form-control"
+                                    placeholder="Search trek, user or staff..."
+                                >
+
+                                <button
+                                    class="btn btn-primary"
+                                    @click="performSearch"
+                                >
+                                    Search
+                                </button>
+
+                            </div>
+
+
+                            <h5>
+                                Treks
+                            </h5>
+
+                            <div
+                                v-for="trek in searchResults.treks"
+                                :key="'t'+trek.id"
+                                class="card mb-2"
+                            >
+                                <div class="card-body">
+
+                                    <strong>
+                                        {{ trek.name }}
+                                    </strong>
+
+                                    -
+                                    {{ trek.location }}
+
+                                </div>
+                            </div>
+
+
+                            <h5 class="mt-4">
+                                Trekkers
+                            </h5>
+
+                            <div
+                                v-for="user in searchResults.users"
+                                :key="'u'+user.id"
+                                class="card mb-2"
+                            >
+                                <div class="card-body">
+
+                                    <strong>
+                                        {{ user.name }}
+                                    </strong>
+
+                                    -
+                                    {{ user.email }}
+
+                                </div>
+                            </div>
+
+
+                            <h5 class="mt-4">
+                                Staff
+                            </h5>
+
+                            <div
+                                v-for="person in searchResults.staff"
+                                :key="'s'+person.id"
+                                class="card mb-2"
+                            >
+                                <div class="card-body">
+
+                                    <strong>
+                                        {{ person.name }}
+                                    </strong>
+
+                                    -
+                                    {{ person.email }}
+
+                                </div>
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- ================================ -->
+                        <!-- STAFF PLACEHOLDER -->
+                        <!-- ================================ -->
+
+                        <div
+                            v-else-if="currentPage==='staff-dashboard'"
+                        >
+
+                            <h2>
                                 Trek Staff Dashboard
                             </h2>
 
-                            <p class="text-muted">
-                                Your assigned treks will appear here.
+                            <p>
+                                Staff operations will be added in the next milestone.
                             </p>
-
-
-                            <div class="card dashboard-card">
-
-                                <div class="card-body">
-
-                                    <h5>
-                                        Staff Account
-                                    </h5>
-
-                                    <p>
-                                        {{ currentUser.email }}
-                                    </p>
-
-                                    <span
-                                        class="badge bg-primary"
-                                    >
-                                        Staff
-                                    </span>
-
-                                </div>
-
-                            </div>
 
                         </div>
 
 
 
                         <!-- ================================ -->
-                        <!-- TREKKER DASHBOARD -->
+                        <!-- TREKKER PLACEHOLDER -->
                         <!-- ================================ -->
 
                         <div
-                            v-else-if="
-                                currentPage ===
-                                'trekker-dashboard'
-                            "
+                            v-else-if="currentPage==='trekker-dashboard'"
                         >
 
-                            <h2 class="fw-bold">
+                            <h2>
                                 Trekker Dashboard
                             </h2>
 
-                            <p class="text-muted">
-                                Browse and book trekking routes.
+                            <p>
+                                Trek booking features will be added in the upcoming milestone.
                             </p>
 
-
-                            <div class="card dashboard-card">
-
-                                <div class="card-body">
-
-                                    <h5>
-                                        Welcome
-                                        {{ currentUser.name }}
-                                    </h5>
-
-
-                                    <p>
-                                        Email:
-                                        {{ currentUser.email }}
-                                    </p>
-
-
-                                    <span
-                                        class="badge bg-success"
-                                    >
-                                        Trekker
-                                    </span>
-
-                                </div>
-
-                            </div>
-
                         </div>
-
 
                     </main>
 
@@ -1306,7 +2498,6 @@ createApp({
         </div>
 
     </div>
-
     `
 
 }).mount("#app");

@@ -260,3 +260,62 @@ body {
         gap: 10px;
     }
 }
+
+/* Admin tables */
+
+.table-container {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.table-container table {
+    margin-bottom: 0;
+}
+
+
+/* Admin forms */
+
+.card {
+    overflow: hidden;
+}
+
+.form-label {
+    font-weight: 500;
+}
+
+
+/* Sidebar buttons */
+
+.sidebar button.nav-link {
+    display: block;
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 5px;
+    border: none;
+    text-decoration: none;
+}
+
+
+/* Dashboard cards */
+
+.dashboard-card {
+    height: 100%;
+}
+
+
+/* Small screens */
+
+@media (max-width: 768px) {
+
+    .sidebar {
+        min-height: auto;
+    }
+
+    .sidebar button.nav-link {
+        display: inline-block;
+        width: auto;
+        margin-right: 4px;
+    }
+}

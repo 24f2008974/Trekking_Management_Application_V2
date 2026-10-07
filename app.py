@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from flask import Flask, jsonify, render_template
 from flask_jwt_extended import JWTManager
-
+from admin_api import admin_bp
 from auth import auth_bp
 from api import api_bp
 from db import init_db
@@ -40,6 +40,7 @@ def create_app():
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(api_bp)
+    app.register_blueprint(admin_bp)
 
     # -----------------------------------------------------
     # FRONTEND ENTRY POINT
