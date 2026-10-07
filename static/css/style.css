@@ -147,3 +147,116 @@ body {
         padding: 16px;
     }
 }
+
+/* ---------------------------------------------------------
+   Authentication
+--------------------------------------------------------- */
+
+.auth-container {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    background-color: #f5f7fa;
+}
+
+
+.auth-card {
+    width: 100%;
+    max-width: 450px;
+    border: none;
+    border-radius: 14px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+
+/* ---------------------------------------------------------
+   Application Layout
+--------------------------------------------------------- */
+
+.app-container {
+    min-height: 100vh;
+}
+
+
+.app-navbar {
+    min-height: 64px;
+}
+
+
+.sidebar {
+    min-height: calc(100vh - 64px);
+    background-color: #212529;
+}
+
+
+.sidebar .nav-link {
+    color: #ced4da;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    margin-bottom: 5px;
+    width: 100%;
+}
+
+
+.sidebar .nav-link:hover:not(:disabled) {
+    background-color: #343a40;
+    color: #ffffff;
+}
+
+
+.sidebar .nav-link.active {
+    background-color: #0d6efd;
+    color: #ffffff;
+}
+
+
+.sidebar .nav-link:disabled {
+    color: #6c757d;
+    cursor: not-allowed;
+}
+
+
+.main-content {
+    min-height: calc(100vh - 64px);
+    padding: 25px;
+    background-color: #f5f7fa;
+}
+
+
+/* ---------------------------------------------------------
+   Dashboard Cards
+--------------------------------------------------------- */
+
+.dashboard-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+
+
+.dashboard-card .card-body {
+    padding: 24px;
+}
+
+
+/* ---------------------------------------------------------
+   Mobile
+--------------------------------------------------------- */
+
+@media (max-width: 768px) {
+
+    .sidebar {
+        min-height: auto;
+    }
+
+    .main-content {
+        padding: 16px;
+    }
+
+    .app-navbar .container-fluid {
+        gap: 10px;
+    }
+}

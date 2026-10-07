@@ -1,19 +1,35 @@
 from functools import wraps
 
-from flask import Blueprint, jsonify, request, session
-from werkzeug.security import check_password_hash
+from flask import Blueprint, jsonify, request
+from flask_jwt_extended import (
+    create_access_token,
+    get_jwt,
+    get_jwt_identity,
+    jwt_required
+)
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from db import get_db_connection
 
 
-auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
+auth_bp = Blueprint(
+    "auth",
+    __name__,
+    url_prefix="/api/auth"
+)
 
+
+# ---------------------------------------------------------
+# REGISTER TREKKER
+# ---------------------------------------------------------
 
 @auth_bp.post("/register")
 def register():
     """
-    Trekker self-registration.
-    Admin and Staff cannot be created through public registration.
+    Public registration endpoint.
+
+    Only Trekkers can self-register.
+    Admin and Staff are not allowed to register here.
     """
 
     data = request.get_json(silent=True)
@@ -29,10 +45,28 @@ def register():
     password = data.get("password", "").strip()
     phone = data.get("phone", "").strip()
 
-    if not name or not email or not password:
+    if not name:
         return jsonify({
             "success": False,
-            "message": "Name, email and password are required"
+            "message": "Name is required"
+        }), 400
+
+    if not email:
+        return jsonify({
+            "success": False,
+            "message": "Email is required"
+        }), 400
+
+    if not password:
+        return jsonify({
+            "success": False,
+            "message": "Password is required"
+        }), 400
+
+    if len(password) < 6:
+        return jsonify({
+            "success": False,
+            "message": "Password must contain at least 6 characters"
         }), 400
 
     connection = get_db_connection()
@@ -54,8 +88,6 @@ def register():
             "message": "Email already registered"
         }), 409
 
-    from werkzeug.security import generate_password_hash
-
     hashed_password = generate_password_hash(password)
 
     cursor = connection.execute(
@@ -66,15 +98,20 @@ def register():
             email,
             password,
             phone,
-            role
+            role,
+            is_active,
+            is_blacklisted
         )
-        VALUES (?, ?, ?, ?, 'Trekker')
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
         (
             name,
             email,
             hashed_password,
-            phone
+            phone,
+            "Trekker",
+            1,
+            0
         )
     )
 
@@ -91,15 +128,23 @@ def register():
             "id": user_id,
             "name": name,
             "email": email,
+            "phone": phone,
             "role": "Trekker"
         }
     }), 201
 
 
+# ---------------------------------------------------------
+# LOGIN
+# ---------------------------------------------------------
+
 @auth_bp.post("/login")
 def login():
     """
-    Login for Admin, Staff and Trekker.
+    Login endpoint for:
+    - Admin
+    - Staff
+    - Trekker
     """
 
     data = request.get_json(silent=True)
@@ -138,68 +183,63 @@ def login():
             "message": "Invalid email or password"
         }), 401
 
-    if not user["is_active"]:
-        return jsonify({
-            "success": False,
-            "message": "Account is inactive"
-        }), 403
-
-    if user["is_blacklisted"]:
-        return jsonify({
-            "success": False,
-            "message": "Account is blacklisted"
-        }), 403
-
-    if not check_password_hash(user["password"], password):
+    if not check_password_hash(
+        user["password"],
+        password
+    ):
         return jsonify({
             "success": False,
             "message": "Invalid email or password"
         }), 401
 
-    session.clear()
+    if not user["is_active"]:
+        return jsonify({
+            "success": False,
+            "message": "Your account is inactive"
+        }), 403
 
-    session["user_id"] = user["id"]
-    session["role"] = user["role"]
+    if user["is_blacklisted"]:
+        return jsonify({
+            "success": False,
+            "message": "Your account has been blacklisted"
+        }), 403
+
+    additional_claims = {
+        "role": user["role"],
+        "name": user["name"]
+    }
+
+    access_token = create_access_token(
+        identity=str(user["id"]),
+        additional_claims=additional_claims
+    )
 
     return jsonify({
         "success": True,
         "message": "Login successful",
+        "access_token": access_token,
         "user": {
             "id": user["id"],
             "name": user["name"],
             "email": user["email"],
+            "phone": user["phone"],
             "role": user["role"]
         }
     })
 
 
-@auth_bp.post("/logout")
-def logout():
-    """
-    Logout the currently logged-in user.
-    """
-
-    session.clear()
-
-    return jsonify({
-        "success": True,
-        "message": "Logout successful"
-    })
-
+# ---------------------------------------------------------
+# CURRENT USER
+# ---------------------------------------------------------
 
 @auth_bp.get("/me")
+@jwt_required()
 def current_user():
     """
-    Return currently authenticated user.
+    Return currently authenticated user's information.
     """
 
-    user_id = session.get("user_id")
-
-    if not user_id:
-        return jsonify({
-            "success": False,
-            "message": "Not authenticated"
-        }), 401
+    user_id = get_jwt_identity()
 
     connection = get_db_connection()
 
@@ -223,12 +263,10 @@ def current_user():
     connection.close()
 
     if user is None:
-        session.clear()
-
         return jsonify({
             "success": False,
             "message": "User not found"
-        }), 401
+        }), 404
 
     return jsonify({
         "success": True,
@@ -236,28 +274,37 @@ def current_user():
     })
 
 
-def login_required(function):
+# ---------------------------------------------------------
+# LOGOUT
+# ---------------------------------------------------------
+
+@auth_bp.post("/logout")
+@jwt_required()
+def logout():
     """
-    Require any authenticated user.
+    JWT tokens are stored client-side.
+
+    Frontend logout will remove the token from localStorage.
     """
 
-    @wraps(function)
-    def decorated_function(*args, **kwargs):
+    return jsonify({
+        "success": True,
+        "message": "Logout successful"
+    })
 
-        if "user_id" not in session:
-            return jsonify({
-                "success": False,
-                "message": "Authentication required"
-            }), 401
 
-        return function(*args, **kwargs)
-
-    return decorated_function
-
+# ---------------------------------------------------------
+# ROLE REQUIRED DECORATOR
+# ---------------------------------------------------------
 
 def role_required(*allowed_roles):
     """
-    Require authentication plus one of the specified roles.
+    Restrict an endpoint to specific roles.
+
+    Example:
+
+    @jwt_required()
+    @role_required("Admin")
     """
 
     def decorator(function):
@@ -265,13 +312,9 @@ def role_required(*allowed_roles):
         @wraps(function)
         def decorated_function(*args, **kwargs):
 
-            if "user_id" not in session:
-                return jsonify({
-                    "success": False,
-                    "message": "Authentication required"
-                }), 401
+            claims = get_jwt()
 
-            user_role = session.get("role")
+            user_role = claims.get("role")
 
             if user_role not in allowed_roles:
                 return jsonify({
