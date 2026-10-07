@@ -59,3 +59,31 @@ Trekking_Management_Application_V2/
 ├── data/
 ├── exports/
 └── reports/
+
+## Project Milestone Progress
+
+| Milestone | Status |
+|---|---|
+| Milestone 0 - GitHub Setup | In Progress |
+| Database Models & Schema | In Progress |
+| Authentication & RBAC | In Progress |
+| Admin Dashboard | Not Started |
+| Trek Staff Dashboard | Not Started |
+| Trekker Dashboard | Not Started |
+| Booking History & Tracking | Not Started |
+| Celery Background Jobs | Not Started |
+| Redis Caching | Not Started |
+| UI/UX & PWA | Not Started |
+| Reports & Analytics | Not Started |
+
+## Issues and Resolutions
+
+### Flask not found in virtual environment
+**Issue:** `ModuleNotFoundError: No module named 'flask'`
+
+**Resolution:** Added Flask to `requirements.txt` and installed dependencies.
+
+### curl request body issue on Windows PowerShell
+**Issue:** Flask received an empty JSON request body while testing with `curl.exe`.
+
+**Resolution:** Used PowerShell `Invoke-RestMethod` with `ConvertTo-Json`.
