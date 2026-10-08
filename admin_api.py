@@ -169,6 +169,7 @@ def create_trek():
         "Approved",
         "Open",
         "Closed",
+        "Ongoing",
         "Completed"
     ]
 
@@ -435,6 +436,7 @@ def update_trek(trek_id):
         "Approved",
         "Open",
         "Closed",
+        "Ongoing",
         "Completed"
     ]
 

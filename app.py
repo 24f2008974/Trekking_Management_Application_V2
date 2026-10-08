@@ -6,7 +6,7 @@ from admin_api import admin_bp
 from auth import auth_bp
 from api import api_bp
 from db import init_db
-
+from staff_api import staff_bp
 
 def create_app():
 
@@ -41,6 +41,7 @@ def create_app():
     app.register_blueprint(auth_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(staff_bp)
 
     # -----------------------------------------------------
     # FRONTEND ENTRY POINT

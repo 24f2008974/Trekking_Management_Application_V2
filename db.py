@@ -154,6 +154,7 @@ def init_db():
                         'Approved',
                         'Open',
                         'Closed',
+                        'Ongoing',
                         'Completed'
                     )
                 ),
