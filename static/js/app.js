@@ -6,26 +6,35 @@ createApp({
         return {
 
             // =================================================
-            // COMMON
+            // COMMON APPLICATION STATE
             // =================================================
 
             currentPage: "login",
+
             loading: false,
+
             errorMessage: "",
+
             successMessage: "",
 
             token: localStorage.getItem("access_token"),
+
             currentUser: null,
 
 
             // =================================================
-            // AUTH
+            // LOGIN
             // =================================================
 
             loginForm: {
                 email: "",
                 password: ""
             },
+
+
+            // =================================================
+            // TREKKER REGISTRATION
+            // =================================================
 
             registerForm: {
                 name: "",
@@ -37,7 +46,7 @@ createApp({
 
 
             // =================================================
-            // ADMIN
+            // ADMIN DASHBOARD
             // =================================================
 
             adminStats: {
@@ -48,6 +57,11 @@ createApp({
                 open_treks: 0,
                 completed_treks: 0
             },
+
+
+            // =================================================
+            // ADMIN TREKS
+            // =================================================
 
             treks: [],
 
@@ -65,6 +79,11 @@ createApp({
                 end_date: "",
                 status: "Pending"
             },
+
+
+            // =================================================
+            // ADMIN STAFF
+            // =================================================
 
             staff: [],
 
@@ -84,8 +103,24 @@ createApp({
                 staff_id: ""
             },
 
+
+            // =================================================
+            // ADMIN USERS
+            // =================================================
+
             users: [],
+
+
+            // =================================================
+            // ADMIN BOOKINGS
+            // =================================================
+
             bookings: [],
+
+
+            // =================================================
+            // ADMIN SEARCH
+            // =================================================
 
             searchQuery: "",
 
@@ -97,7 +132,7 @@ createApp({
 
 
             // =================================================
-            // STAFF
+            // STAFF DASHBOARD
             // =================================================
 
             staffStats: {
@@ -108,19 +143,36 @@ createApp({
                 total_participants: 0
             },
 
+
+            // =================================================
+            // STAFF TREKS
+            // =================================================
+
             staffTreks: [],
+
             selectedStaffTrek: null,
 
             staffSlotForm: {
                 total_slots: 1
             },
 
+
+            // =================================================
+            // STAFF PARTICIPANTS
+            // =================================================
+
             staffParticipants: [],
+
+
+            // =================================================
+            // STAFF PROFILE
+            // =================================================
+
             staffProfile: null,
 
 
             // =================================================
-            // TREKKER
+            // TREKKER DASHBOARD
             // =================================================
 
             trekkerStats: {
@@ -129,6 +181,11 @@ createApp({
                 completed_treks: 0,
                 cancelled_bookings: 0
             },
+
+
+            // =================================================
+            // TREKKER TREKS
+            // =================================================
 
             availableTreks: [],
 
@@ -141,29 +198,58 @@ createApp({
                 duration: ""
             },
 
+
+            // =================================================
+            // TREKKER BOOKINGS
+            // =================================================
+
             trekkerBookings: [],
+
             trekkerHistory: [],
+
+
+            // =================================================
+            // TREKKER PROFILE
+            // =================================================
 
             trekkerProfile: null,
 
             trekkerProfileForm: {
                 name: "",
                 phone: ""
-            }
+            },
+
+
+            // =================================================
+            // CELERY EXPORT JOB
+            // =================================================
+
+            exportJob: null,
+
+
+            // =================================================
+            // NOTIFICATIONS
+            // =================================================
+
+            notifications: [],
+
+            unreadNotifications: 0
         };
     },
 
 
     // =========================================================
-    // APP START
+    // APPLICATION START
     // =========================================================
 
     async mounted() {
 
         if (this.token) {
+
             await this.loadCurrentUser();
-        }
-        else {
+
+        } else {
+
             this.currentPage = "login";
         }
     },
@@ -172,11 +258,13 @@ createApp({
     methods: {
 
         // =====================================================
-        // COMMON
+        // COMMON HELPERS
         // =====================================================
 
         clearMessages() {
+
             this.errorMessage = "";
+
             this.successMessage = "";
         },
 
@@ -187,18 +275,23 @@ createApp({
                 ...(options.headers || {})
             };
 
+
             if (this.token) {
+
                 headers["Authorization"] =
                     `Bearer ${this.token}`;
             }
+
 
             if (
                 options.body &&
                 !headers["Content-Type"]
             ) {
+
                 headers["Content-Type"] =
                     "application/json";
             }
+
 
             const response = await fetch(
                 url,
@@ -208,14 +301,19 @@ createApp({
                 }
             );
 
+
             let data = {};
 
+
             try {
+
                 data = await response.json();
-            }
-            catch (error) {
+
+            } catch (error) {
+
                 data = {};
             }
+
 
             if (response.status === 401) {
 
@@ -223,14 +321,19 @@ createApp({
                     "access_token"
                 );
 
+
                 this.token = null;
+
                 this.currentUser = null;
+
                 this.currentPage = "login";
+
 
                 throw new Error(
                     "Session expired. Please login again."
                 );
             }
+
 
             if (!response.ok) {
 
@@ -239,6 +342,7 @@ createApp({
                     `Request failed (${response.status})`
                 );
             }
+
 
             return data;
         },
@@ -252,16 +356,21 @@ createApp({
 
             this.clearMessages();
 
+
             if (
                 !this.loginForm.email ||
                 !this.loginForm.password
             ) {
+
                 this.errorMessage =
                     "Email and password are required.";
+
                 return;
             }
 
+
             this.loading = true;
+
 
             try {
 
@@ -285,76 +394,95 @@ createApp({
                     }
                 );
 
+
                 const data =
                     await response.json();
 
+
                 if (!response.ok) {
+
                     throw new Error(
                         data.message ||
                         "Login failed."
                     );
                 }
 
+
                 this.token =
                     data.access_token;
+
 
                 localStorage.setItem(
                     "access_token",
                     this.token
                 );
 
+
                 this.currentUser =
                     data.user;
 
+
                 await this.redirectByRole();
 
-            }
-            catch (error) {
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
-            }
-            finally {
+
+            } finally {
+
                 this.loading = false;
             }
         },
 
 
         // =====================================================
-        // REGISTER
+        // TREKKER REGISTER
         // =====================================================
 
         async register() {
 
             this.clearMessages();
 
+
             if (
                 !this.registerForm.name ||
                 !this.registerForm.email ||
                 !this.registerForm.password
             ) {
+
                 this.errorMessage =
                     "Name, email and password are required.";
+
                 return;
             }
+
 
             if (
                 this.registerForm.password !==
                 this.registerForm.confirmPassword
             ) {
+
                 this.errorMessage =
                     "Passwords do not match.";
+
                 return;
             }
+
 
             if (
                 this.registerForm.password.length < 6
             ) {
+
                 this.errorMessage =
                     "Password must contain at least 6 characters.";
+
                 return;
             }
 
+
             this.loading = true;
+
 
             try {
 
@@ -384,15 +512,19 @@ createApp({
                     }
                 );
 
+
                 const data =
                     await response.json();
 
+
                 if (!response.ok) {
+
                     throw new Error(
                         data.message ||
                         "Registration failed."
                     );
                 }
+
 
                 this.registerForm = {
                     name: "",
@@ -402,24 +534,28 @@ createApp({
                     confirmPassword: ""
                 };
 
-                this.currentPage = "login";
+
+                this.currentPage =
+                    "login";
+
 
                 this.successMessage =
                     "Registration successful. Please login.";
 
-            }
-            catch (error) {
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
-            }
-            finally {
+
+            } finally {
+
                 this.loading = false;
             }
         },
 
 
         // =====================================================
-        // CURRENT USER
+        // LOAD CURRENT USER
         // =====================================================
 
         async loadCurrentUser() {
@@ -431,13 +567,15 @@ createApp({
                         "/api/auth/me"
                     );
 
+
                 this.currentUser =
                     data.user;
 
+
                 await this.redirectByRole();
 
-            }
-            catch (error) {
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
             }
@@ -445,44 +583,59 @@ createApp({
 
 
         // =====================================================
-        // ROLE REDIRECT
+        // REDIRECT BASED ON ROLE
         // =====================================================
 
         async redirectByRole() {
 
             if (!this.currentUser) {
-                this.currentPage = "login";
+
+                this.currentPage =
+                    "login";
+
                 return;
             }
 
+
             if (
-                this.currentUser.role === "Admin"
+                this.currentUser.role ===
+                "Admin"
             ) {
 
                 this.currentPage =
                     "admin-dashboard";
 
+
                 await this.loadAdminDashboard();
             }
 
+
             else if (
-                this.currentUser.role === "Staff"
+                this.currentUser.role ===
+                "Staff"
             ) {
 
                 this.currentPage =
                     "staff-dashboard";
 
+
                 await this.loadStaffDashboard();
             }
 
+
             else if (
-                this.currentUser.role === "Trekker"
+                this.currentUser.role ===
+                "Trekker"
             ) {
 
                 this.currentPage =
                     "trekker-dashboard";
 
+
                 await this.loadTrekkerDashboard();
+
+
+                await this.loadNotifications();
             }
         },
 
@@ -505,23 +658,40 @@ createApp({
                     );
                 }
 
+            } catch (error) {
+
+                console.log(
+                    "Logout API error:",
+                    error
+                );
             }
-            catch (error) {
-                console.log(error);
-            }
+
 
             localStorage.removeItem(
                 "access_token"
             );
 
+
             this.token = null;
+
             this.currentUser = null;
-            this.currentPage = "login";
+
+            this.currentPage =
+                "login";
+
 
             this.loginForm = {
                 email: "",
                 password: ""
             };
+
+
+            this.exportJob = null;
+
+            this.notifications = [];
+
+            this.unreadNotifications = 0;
+
 
             this.clearMessages();
         },
@@ -538,72 +708,154 @@ createApp({
             this.currentPage = page;
 
 
+            // -------------------------------------------------
             // ADMIN
+            // -------------------------------------------------
 
-            if (page === "admin-dashboard") {
+            if (
+                page ===
+                "admin-dashboard"
+            ) {
+
                 await this.loadAdminDashboard();
             }
 
-            if (page === "admin-treks") {
+
+            if (
+                page ===
+                "admin-treks"
+            ) {
+
                 await this.loadTreks();
             }
 
-            if (page === "admin-staff") {
+
+            if (
+                page ===
+                "admin-staff"
+            ) {
+
                 await this.loadStaff();
+
                 await this.loadTreks();
             }
 
-            if (page === "admin-users") {
+
+            if (
+                page ===
+                "admin-users"
+            ) {
+
                 await this.loadUsers();
             }
 
-            if (page === "admin-bookings") {
+
+            if (
+                page ===
+                "admin-bookings"
+            ) {
+
                 await this.loadBookings();
             }
 
 
+            // -------------------------------------------------
             // STAFF
+            // -------------------------------------------------
 
-            if (page === "staff-dashboard") {
+            if (
+                page ===
+                "staff-dashboard"
+            ) {
+
                 await this.loadStaffDashboard();
             }
 
-            if (page === "staff-treks") {
+
+            if (
+                page ===
+                "staff-treks"
+            ) {
+
                 await this.loadStaffTreks();
             }
 
-            if (page === "staff-participants") {
+
+            if (
+                page ===
+                "staff-participants"
+            ) {
 
                 this.selectedStaffTrek = null;
 
                 await this.loadStaffParticipants();
             }
 
-            if (page === "staff-profile") {
+
+            if (
+                page ===
+                "staff-profile"
+            ) {
+
                 await this.loadStaffProfile();
             }
 
 
+            // -------------------------------------------------
             // TREKKER
+            // -------------------------------------------------
 
-            if (page === "trekker-dashboard") {
+            if (
+                page ===
+                "trekker-dashboard"
+            ) {
+
                 await this.loadTrekkerDashboard();
             }
 
-            if (page === "trekker-treks") {
+
+            if (
+                page ===
+                "trekker-treks"
+            ) {
+
                 await this.loadAvailableTreks();
             }
 
-            if (page === "trekker-bookings") {
+
+            if (
+                page ===
+                "trekker-bookings"
+            ) {
+
                 await this.loadTrekkerBookings();
             }
 
-            if (page === "trekker-history") {
+
+            if (
+                page ===
+                "trekker-history"
+            ) {
+
                 await this.loadTrekkerHistory();
             }
 
-            if (page === "trekker-profile") {
+
+            if (
+                page ===
+                "trekker-profile"
+            ) {
+
                 await this.loadTrekkerProfile();
+            }
+
+
+            if (
+                page ===
+                "trekker-notifications"
+            ) {
+
+                await this.loadNotifications();
             }
         },
 
@@ -621,11 +873,12 @@ createApp({
                         "/api/admin/dashboard"
                     );
 
+
                 this.adminStats =
                     data.stats;
 
-            }
-            catch (error) {
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
             }
@@ -645,11 +898,12 @@ createApp({
                         "/api/admin/treks"
                     );
 
+
                 this.treks =
                     data.treks;
 
-            }
-            catch (error) {
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
             }
@@ -671,6 +925,7 @@ createApp({
                 status: "Pending"
             };
 
+
             this.trekFormMode =
                 "create";
         },
@@ -680,18 +935,23 @@ createApp({
 
             this.clearMessages();
 
+
             if (
                 !this.trekForm.name ||
                 !this.trekForm.location
             ) {
+
                 this.errorMessage =
                     "Trek name and location are required.";
+
                 return;
             }
+
 
             try {
 
                 const payload = {
+
                     name:
                         this.trekForm.name,
 
@@ -724,6 +984,7 @@ createApp({
                         this.trekForm.status
                 };
 
+
                 if (
                     this.trekFormMode ===
                     "create"
@@ -740,6 +1001,7 @@ createApp({
                                 )
                         }
                     );
+
 
                     this.successMessage =
                         "Trek created successfully.";
@@ -759,18 +1021,21 @@ createApp({
                         }
                     );
 
+
                     this.successMessage =
                         "Trek updated successfully.";
                 }
 
+
                 this.resetTrekForm();
+
 
                 await this.loadTreks();
 
                 await this.loadAdminDashboard();
 
-            }
-            catch (error) {
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
             }
@@ -779,20 +1044,46 @@ createApp({
 
         editTrek(trek) {
 
-            this.trekFormMode = "edit";
+            this.clearMessages();
+
+
+            this.trekFormMode =
+                "edit";
+
 
             this.trekForm = {
-                id: trek.id,
-                name: trek.name,
-                location: trek.location,
-                difficulty: trek.difficulty,
-                duration: trek.duration,
-                total_slots: trek.total_slots,
-                description: trek.description || "",
-                start_date: trek.start_date || "",
-                end_date: trek.end_date || "",
-                status: trek.status
+
+                id:
+                    trek.id,
+
+                name:
+                    trek.name,
+
+                location:
+                    trek.location,
+
+                difficulty:
+                    trek.difficulty,
+
+                duration:
+                    trek.duration,
+
+                total_slots:
+                    trek.total_slots,
+
+                description:
+                    trek.description || "",
+
+                start_date:
+                    trek.start_date || "",
+
+                end_date:
+                    trek.end_date || "",
+
+                status:
+                    trek.status
             };
+
 
             window.scrollTo({
                 top: 0,
@@ -803,13 +1094,20 @@ createApp({
 
         async deleteTrek(trek) {
 
-            if (
-                !confirm(
+            const confirmed =
+                confirm(
                     `Delete "${trek.name}"?`
-                )
-            ) {
+                );
+
+
+            if (!confirmed) {
+
                 return;
             }
+
+
+            this.clearMessages();
+
 
             try {
 
@@ -821,15 +1119,17 @@ createApp({
                         }
                     );
 
+
                 this.successMessage =
                     data.message;
+
 
                 await this.loadTreks();
 
                 await this.loadAdminDashboard();
 
-            }
-            catch (error) {
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
             }
@@ -849,11 +1149,12 @@ createApp({
                         "/api/admin/staff"
                     );
 
+
                 this.staff =
                     data.staff;
 
-            }
-            catch (error) {
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
             }
@@ -864,15 +1165,19 @@ createApp({
 
             this.clearMessages();
 
+
             if (
                 !this.staffForm.name ||
                 !this.staffForm.email ||
                 !this.staffForm.password
             ) {
+
                 this.errorMessage =
                     "Name, email and password are required.";
+
                 return;
             }
+
 
             try {
 
@@ -889,8 +1194,10 @@ createApp({
                         }
                     );
 
+
                 this.successMessage =
                     data.message;
+
 
                 this.staffForm = {
                     name: "",
@@ -903,11 +1210,13 @@ createApp({
                     address: ""
                 };
 
+
                 await this.loadStaff();
+
                 await this.loadAdminDashboard();
 
-            }
-            catch (error) {
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
             }
@@ -918,14 +1227,18 @@ createApp({
 
             this.clearMessages();
 
+
             if (
                 !this.assignForm.trek_id ||
                 !this.assignForm.staff_id
             ) {
+
                 this.errorMessage =
-                    "Select trek and staff.";
+                    "Select both trek and staff.";
+
                 return;
             }
+
 
             try {
 
@@ -945,19 +1258,23 @@ createApp({
                         }
                     );
 
+
                 this.successMessage =
                     data.message;
+
 
                 this.assignForm = {
                     trek_id: "",
                     staff_id: ""
                 };
 
-                await this.loadTreks();
+
                 await this.loadStaff();
 
-            }
-            catch (error) {
+                await this.loadTreks();
+
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
             }
@@ -977,11 +1294,12 @@ createApp({
                         "/api/admin/users"
                     );
 
+
                 this.users =
                     data.users;
 
-            }
-            catch (error) {
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
             }
@@ -992,6 +1310,9 @@ createApp({
             user,
             blacklisted
         ) {
+
+            this.clearMessages();
+
 
             try {
 
@@ -1013,15 +1334,17 @@ createApp({
                     }
                 );
 
+
                 this.successMessage =
                     blacklisted
-                        ? "User blacklisted."
-                        : "Blacklist removed.";
+                    ? `${user.name} blacklisted.`
+                    : `${user.name} removed from blacklist.`;
+
 
                 await this.loadUsers();
 
-            }
-            catch (error) {
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
             }
@@ -1032,6 +1355,9 @@ createApp({
             user,
             active
         ) {
+
+            this.clearMessages();
+
 
             try {
 
@@ -1053,15 +1379,17 @@ createApp({
                     }
                 );
 
+
                 this.successMessage =
                     active
-                        ? "User activated."
-                        : "User deactivated.";
+                    ? `${user.name} activated.`
+                    : `${user.name} deactivated.`;
+
 
                 await this.loadUsers();
 
-            }
-            catch (error) {
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
             }
@@ -1081,11 +1409,12 @@ createApp({
                         "/api/admin/bookings"
                     );
 
+
                 this.bookings =
                     data.bookings;
 
-            }
-            catch (error) {
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
             }
@@ -1098,7 +1427,12 @@ createApp({
 
         async performSearch() {
 
-            if (!this.searchQuery.trim()) {
+            this.clearMessages();
+
+
+            if (
+                !this.searchQuery.trim()
+            ) {
 
                 this.searchResults = {
                     treks: [],
@@ -1109,6 +1443,7 @@ createApp({
                 return;
             }
 
+
             try {
 
                 const data =
@@ -1118,14 +1453,20 @@ createApp({
                         )}`
                     );
 
+
                 this.searchResults = {
-                    treks: data.treks,
-                    users: data.users,
-                    staff: data.staff
+                    treks:
+                        data.treks,
+
+                    users:
+                        data.users,
+
+                    staff:
+                        data.staff
                 };
 
-            }
-            catch (error) {
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
             }
@@ -1133,10 +1474,13 @@ createApp({
 
 
         // =====================================================
-        // STAFF
+        // STAFF DASHBOARD
         // =====================================================
 
         async loadStaffDashboard() {
+
+            this.clearMessages();
+
 
             try {
 
@@ -1145,18 +1489,26 @@ createApp({
                         "/api/staff/dashboard"
                     );
 
+
                 this.staffStats =
                     data.stats;
 
-            }
-            catch (error) {
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
             }
         },
 
 
+        // =====================================================
+        // STAFF TREKS
+        // =====================================================
+
         async loadStaffTreks() {
+
+            this.clearMessages();
+
 
             try {
 
@@ -1165,11 +1517,12 @@ createApp({
                         "/api/staff/treks"
                     );
 
+
                 this.staffTreks =
                     data.treks;
 
-            }
-            catch (error) {
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
             }
@@ -1178,12 +1531,17 @@ createApp({
 
         selectStaffTrek(trek) {
 
+            this.clearMessages();
+
+
             this.selectedStaffTrek = {
                 ...trek
             };
 
+
             this.staffSlotForm.total_slots =
                 trek.total_slots;
+
 
             this.currentPage =
                 "staff-manage-trek";
@@ -1192,9 +1550,16 @@ createApp({
 
         async updateStaffSlots() {
 
-            if (!this.selectedStaffTrek) {
+            this.clearMessages();
+
+
+            if (
+                !this.selectedStaffTrek
+            ) {
+
                 return;
             }
+
 
             try {
 
@@ -1214,38 +1579,55 @@ createApp({
                         }
                     );
 
+
                 this.successMessage =
                     data.message;
+
 
                 this.selectedStaffTrek.total_slots =
                     data.total_slots;
 
+
                 this.selectedStaffTrek.available_slots =
                     data.available_slots;
 
+
                 await this.loadStaffTreks();
 
-            }
-            catch (error) {
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
             }
         },
 
 
-        async updateStaffStatus(status) {
+        async updateStaffStatus(
+            status
+        ) {
 
-            if (!this.selectedStaffTrek) {
-                return;
-            }
+            this.clearMessages();
+
 
             if (
-                !confirm(
-                    `Change status to ${status}?`
-                )
+                !this.selectedStaffTrek
             ) {
+
                 return;
             }
+
+
+            const confirmed =
+                confirm(
+                    `Change trek status to ${status}?`
+                );
+
+
+            if (!confirmed) {
+
+                return;
+            }
+
 
             try {
 
@@ -1257,29 +1639,41 @@ createApp({
 
                             body:
                                 JSON.stringify({
-                                    status: status
+                                    status:
+                                        status
                                 })
                         }
                     );
 
+
                 this.successMessage =
                     data.message;
+
 
                 this.selectedStaffTrek.status =
                     status;
 
+
                 await this.loadStaffTreks();
+
                 await this.loadStaffDashboard();
 
-            }
-            catch (error) {
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
             }
         },
 
 
+        // =====================================================
+        // STAFF PARTICIPANTS
+        // =====================================================
+
         async loadStaffParticipants() {
+
+            this.clearMessages();
+
 
             try {
 
@@ -1288,18 +1682,24 @@ createApp({
                         "/api/staff/participants"
                     );
 
+
                 this.staffParticipants =
                     data.participants;
 
-            }
-            catch (error) {
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
             }
         },
 
 
-        async viewTrekParticipants(trek) {
+        async viewTrekParticipants(
+            trek
+        ) {
+
+            this.clearMessages();
+
 
             try {
 
@@ -1308,24 +1708,34 @@ createApp({
                         `/api/staff/treks/${trek.id}/participants`
                     );
 
+
                 this.selectedStaffTrek =
                     trek;
+
 
                 this.staffParticipants =
                     data.participants;
 
+
                 this.currentPage =
                     "staff-participants";
 
-            }
-            catch (error) {
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
             }
         },
 
 
+        // =====================================================
+        // STAFF PROFILE
+        // =====================================================
+
         async loadStaffProfile() {
+
+            this.clearMessages();
+
 
             try {
 
@@ -1334,11 +1744,12 @@ createApp({
                         "/api/staff/profile"
                     );
 
+
                 this.staffProfile =
                     data.profile;
 
-            }
-            catch (error) {
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
             }
@@ -1351,6 +1762,9 @@ createApp({
 
         async loadTrekkerDashboard() {
 
+            this.clearMessages();
+
+
             try {
 
                 const data =
@@ -1358,11 +1772,12 @@ createApp({
                         "/api/trekker/dashboard"
                     );
 
+
                 this.trekkerStats =
                     data.stats;
 
-            }
-            catch (error) {
+            } catch (error) {
+
                 this.errorMessage =
                     error.message;
             }
@@ -1370,12 +1785,13 @@ createApp({
 
 
         // =====================================================
-        // AVAILABLE TREKS
+        // TREKKER AVAILABLE TREKS
         // =====================================================
 
         async loadAvailableTreks() {
 
             this.clearMessages();
+
 
             try {
 
@@ -1451,8 +1867,7 @@ createApp({
                 this.availableTreks =
                     data.treks;
 
-            }
-            catch (error) {
+            } catch (error) {
 
                 this.errorMessage =
                     error.message;
@@ -1469,6 +1884,7 @@ createApp({
                 duration: ""
             };
 
+
             this.loadAvailableTreks();
         },
 
@@ -1477,9 +1893,12 @@ createApp({
         // TREK DETAILS
         // =====================================================
 
-        async viewTrekDetails(trek) {
+        async viewTrekDetails(
+            trek
+        ) {
 
             this.clearMessages();
+
 
             try {
 
@@ -1488,14 +1907,15 @@ createApp({
                         `/api/trekker/treks/${trek.id}`
                     );
 
+
                 this.selectedTrek =
                     data.trek;
+
 
                 this.currentPage =
                     "trekker-trek-details";
 
-            }
-            catch (error) {
+            } catch (error) {
 
                 this.errorMessage =
                     error.message;
@@ -1512,11 +1932,14 @@ createApp({
             this.clearMessages();
 
 
-            if (
-                !confirm(
+            const confirmed =
+                confirm(
                     `Book "${trek.name}"?`
-                )
-            ) {
+                );
+
+
+            if (!confirmed) {
+
                 return;
             }
 
@@ -1538,7 +1961,14 @@ createApp({
 
                 await this.loadTrekkerDashboard();
 
-                await this.loadAvailableTreks();
+
+                if (
+                    this.currentPage ===
+                    "trekker-treks"
+                ) {
+
+                    await this.loadAvailableTreks();
+                }
 
 
                 if (
@@ -1551,12 +1981,12 @@ createApp({
                             `/api/trekker/treks/${trek.id}`
                         );
 
+
                     this.selectedTrek =
                         details.trek;
                 }
 
-            }
-            catch (error) {
+            } catch (error) {
 
                 this.errorMessage =
                     error.message;
@@ -1565,12 +1995,13 @@ createApp({
 
 
         // =====================================================
-        // MY BOOKINGS
+        // TREKKER BOOKINGS
         // =====================================================
 
         async loadTrekkerBookings() {
 
             this.clearMessages();
+
 
             try {
 
@@ -1579,11 +2010,11 @@ createApp({
                         "/api/trekker/bookings"
                     );
 
+
                 this.trekkerBookings =
                     data.bookings;
 
-            }
-            catch (error) {
+            } catch (error) {
 
                 this.errorMessage =
                     error.message;
@@ -1591,20 +2022,21 @@ createApp({
         },
 
 
-        // =====================================================
-        // CANCEL BOOKING
-        // =====================================================
-
-        async cancelBooking(booking) {
+        async cancelBooking(
+            booking
+        ) {
 
             this.clearMessages();
 
 
-            if (
-                !confirm(
+            const confirmed =
+                confirm(
                     `Cancel booking for "${booking.trek_name}"?`
-                )
-            ) {
+                );
+
+
+            if (!confirmed) {
+
                 return;
             }
 
@@ -1628,8 +2060,7 @@ createApp({
 
                 await this.loadTrekkerDashboard();
 
-            }
-            catch (error) {
+            } catch (error) {
 
                 this.errorMessage =
                     error.message;
@@ -1638,12 +2069,13 @@ createApp({
 
 
         // =====================================================
-        // HISTORY
+        // TREKKER HISTORY
         // =====================================================
 
         async loadTrekkerHistory() {
 
             this.clearMessages();
+
 
             try {
 
@@ -1652,11 +2084,11 @@ createApp({
                         "/api/trekker/history"
                     );
 
+
                 this.trekkerHistory =
                     data.history;
 
-            }
-            catch (error) {
+            } catch (error) {
 
                 this.errorMessage =
                     error.message;
@@ -1665,12 +2097,13 @@ createApp({
 
 
         // =====================================================
-        // PROFILE
+        // TREKKER PROFILE
         // =====================================================
 
         async loadTrekkerProfile() {
 
             this.clearMessages();
+
 
             try {
 
@@ -1678,6 +2111,7 @@ createApp({
                     await this.apiRequest(
                         "/api/trekker/profile"
                     );
+
 
                 this.trekkerProfile =
                     data.profile;
@@ -1691,8 +2125,7 @@ createApp({
                         data.profile.phone || ""
                 };
 
-            }
-            catch (error) {
+            } catch (error) {
 
                 this.errorMessage =
                     error.message;
@@ -1747,8 +2180,297 @@ createApp({
                 this.successMessage =
                     data.message;
 
+            } catch (error) {
+
+                this.errorMessage =
+                    error.message;
             }
-            catch (error) {
+        },
+
+
+        // =====================================================
+        // START CELERY CSV EXPORT
+        // =====================================================
+
+        async startHistoryExport() {
+
+            this.clearMessages();
+
+
+            try {
+
+                const data =
+                    await this.apiRequest(
+                        "/api/jobs/trekker/history-export",
+                        {
+                            method: "POST"
+                        }
+                    );
+
+
+                this.exportJob = {
+                    id:
+                        data.job_id,
+
+                    status:
+                        "Pending",
+
+                    file_name:
+                        null
+                };
+
+
+                this.successMessage =
+                    "CSV export started in background.";
+
+
+                await this.checkExportStatus();
+
+            } catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        // =====================================================
+        // CHECK CELERY EXPORT STATUS
+        // =====================================================
+
+        async checkExportStatus() {
+
+            if (!this.exportJob) {
+
+                return;
+            }
+
+
+            try {
+
+                const data =
+                    await this.apiRequest(
+                        `/api/jobs/trekker/history-export/${this.exportJob.id}`
+                    );
+
+
+                this.exportJob =
+                    data.job;
+
+
+                if (
+                    data.job.status ===
+                    "Pending" ||
+                    data.job.status ===
+                    "Processing"
+                ) {
+
+                    setTimeout(
+                        () => {
+                            this.checkExportStatus();
+                        },
+                        2000
+                    );
+                }
+
+
+                else if (
+                    data.job.status ===
+                    "Completed"
+                ) {
+
+                    this.successMessage =
+                        "CSV export completed successfully.";
+
+
+                    await this.loadNotifications();
+                }
+
+
+                else if (
+                    data.job.status ===
+                    "Failed"
+                ) {
+
+                    this.errorMessage =
+                        data.job.error_message ||
+                        "CSV export failed.";
+                }
+
+            } catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        // =====================================================
+        // DOWNLOAD CSV
+        // =====================================================
+
+        async downloadHistoryExport() {
+
+            if (
+                !this.exportJob ||
+                this.exportJob.status !==
+                "Completed"
+            ) {
+
+                return;
+            }
+
+
+            try {
+
+                const response = await fetch(
+                    `/api/jobs/trekker/history-export/${this.exportJob.id}/download`,
+                    {
+                        headers: {
+                            "Authorization":
+                                `Bearer ${this.token}`
+                        }
+                    }
+                );
+
+
+                if (!response.ok) {
+
+                    let message =
+                        "Download failed.";
+
+
+                    try {
+
+                        const data =
+                            await response.json();
+
+
+                        message =
+                            data.message ||
+                            message;
+
+                    } catch (error) {
+                    }
+
+
+                    throw new Error(
+                        message
+                    );
+                }
+
+
+                const blob =
+                    await response.blob();
+
+
+                const url =
+                    window.URL.createObjectURL(
+                        blob
+                    );
+
+
+                const link =
+                    document.createElement(
+                        "a"
+                    );
+
+
+                link.href = url;
+
+
+                link.download =
+                    this.exportJob.file_name ||
+                    "trek_history.csv";
+
+
+                document.body.appendChild(
+                    link
+                );
+
+
+                link.click();
+
+
+                link.remove();
+
+
+                window.URL.revokeObjectURL(
+                    url
+                );
+
+            } catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        // =====================================================
+        // NOTIFICATIONS
+        // =====================================================
+
+        async loadNotifications() {
+
+            try {
+
+                const data =
+                    await this.apiRequest(
+                        "/api/jobs/notifications"
+                    );
+
+
+                this.notifications =
+                    data.notifications;
+
+
+                this.unreadNotifications =
+                    this.notifications.filter(
+                        notification =>
+                            !notification.is_read
+                    ).length;
+
+            } catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        async markNotificationRead(
+            notification
+        ) {
+
+            if (
+                notification.is_read
+            ) {
+
+                return;
+            }
+
+
+            try {
+
+                await this.apiRequest(
+                    `/api/jobs/notifications/${notification.id}/read`,
+                    {
+                        method: "PATCH"
+                    }
+                );
+
+
+                notification.is_read = 1;
+
+
+                this.unreadNotifications =
+                    Math.max(
+                        0,
+                        this.unreadNotifications - 1
+                    );
+
+            } catch (error) {
 
                 this.errorMessage =
                     error.message;
@@ -1758,7 +2480,7 @@ createApp({
 
 
     // =========================================================
-    // TEMPLATE
+    // VUE TEMPLATE
     // =========================================================
 
     template: `
@@ -1766,7 +2488,7 @@ createApp({
     <div>
 
         <!-- ================================================= -->
-        <!-- LOGIN -->
+        <!-- LOGIN PAGE -->
         <!-- ================================================= -->
 
         <div
@@ -1781,6 +2503,7 @@ createApp({
                     <h2 class="fw-bold text-center">
                         Trekking Management
                     </h2>
+
 
                     <p class="text-muted text-center">
                         Login to continue
@@ -1803,7 +2526,9 @@ createApp({
                     </div>
 
 
-                    <form @submit.prevent="login">
+                    <form
+                        @submit.prevent="login"
+                    >
 
                         <div class="mb-3">
 
@@ -1815,6 +2540,7 @@ createApp({
                                 v-model.trim="loginForm.email"
                                 type="email"
                                 class="form-control"
+                                placeholder="Enter email"
                             >
 
                         </div>
@@ -1830,6 +2556,7 @@ createApp({
                                 v-model="loginForm.password"
                                 type="password"
                                 class="form-control"
+                                placeholder="Enter password"
                             >
 
                         </div>
@@ -1839,11 +2566,13 @@ createApp({
                             class="btn btn-primary w-100"
                             :disabled="loading"
                         >
+
                             {{
                                 loading
                                 ? "Logging in..."
                                 : "Login"
                             }}
+
                         </button>
 
                     </form>
@@ -1877,11 +2606,14 @@ createApp({
 
 
         <!-- ================================================= -->
-        <!-- REGISTER -->
+        <!-- REGISTER PAGE -->
         <!-- ================================================= -->
 
         <div
-            v-else-if="currentPage === 'register'"
+            v-else-if="
+                currentPage ===
+                'register'
+            "
             class="auth-container"
         >
 
@@ -1894,6 +2626,11 @@ createApp({
                     </h2>
 
 
+                    <p class="text-muted text-center">
+                        Create your trekking account
+                    </p>
+
+
                     <div
                         v-if="errorMessage"
                         class="alert alert-danger"
@@ -1902,13 +2639,16 @@ createApp({
                     </div>
 
 
-                    <form @submit.prevent="register">
+                    <form
+                        @submit.prevent="register"
+                    >
 
                         <input
                             v-model.trim="registerForm.name"
                             class="form-control mb-3"
                             placeholder="Full Name"
                         >
+
 
                         <input
                             v-model.trim="registerForm.email"
@@ -1917,11 +2657,13 @@ createApp({
                             placeholder="Email"
                         >
 
+
                         <input
                             v-model.trim="registerForm.phone"
                             class="form-control mb-3"
                             placeholder="Phone"
                         >
+
 
                         <input
                             v-model="registerForm.password"
@@ -1929,6 +2671,7 @@ createApp({
                             class="form-control mb-3"
                             placeholder="Password"
                         >
+
 
                         <input
                             v-model="registerForm.confirmPassword"
@@ -1940,6 +2683,7 @@ createApp({
 
                         <button
                             class="btn btn-success w-100"
+                            :disabled="loading"
                         >
                             Register
                         </button>
@@ -1969,11 +2713,13 @@ createApp({
 
 
         <!-- ================================================= -->
-        <!-- LOGGED IN -->
+        <!-- LOGGED IN APPLICATION -->
         <!-- ================================================= -->
 
-        <div v-else>
-
+        <div
+            v-else
+            class="app-container"
+        >
 
             <!-- NAVBAR -->
 
@@ -1986,9 +2732,14 @@ createApp({
                 </span>
 
 
-                <div class="text-light">
+                <div
+                    class="d-flex align-items-center"
+                >
 
-                    <span v-if="currentUser">
+                    <span
+                        v-if="currentUser"
+                        class="text-light"
+                    >
 
                         {{ currentUser.name }}
 
@@ -2009,6 +2760,7 @@ createApp({
                 </div>
 
             </nav>
+
 
 
             <div class="container-fluid">
@@ -2035,8 +2787,16 @@ createApp({
 
                         <button
                             class="nav-link text-start"
-                            :class="{active: currentPage==='admin-dashboard'}"
-                            @click="navigate('admin-dashboard')"
+                            :class="{
+                                active:
+                                currentPage ===
+                                'admin-dashboard'
+                            }"
+                            @click="
+                                navigate(
+                                    'admin-dashboard'
+                                )
+                            "
                         >
                             Dashboard
                         </button>
@@ -2044,8 +2804,16 @@ createApp({
 
                         <button
                             class="nav-link text-start"
-                            :class="{active: currentPage==='admin-treks'}"
-                            @click="navigate('admin-treks')"
+                            :class="{
+                                active:
+                                currentPage ===
+                                'admin-treks'
+                            }"
+                            @click="
+                                navigate(
+                                    'admin-treks'
+                                )
+                            "
                         >
                             Manage Treks
                         </button>
@@ -2053,8 +2821,16 @@ createApp({
 
                         <button
                             class="nav-link text-start"
-                            :class="{active: currentPage==='admin-staff'}"
-                            @click="navigate('admin-staff')"
+                            :class="{
+                                active:
+                                currentPage ===
+                                'admin-staff'
+                            }"
+                            @click="
+                                navigate(
+                                    'admin-staff'
+                                )
+                            "
                         >
                             Trek Staff
                         </button>
@@ -2062,8 +2838,16 @@ createApp({
 
                         <button
                             class="nav-link text-start"
-                            :class="{active: currentPage==='admin-users'}"
-                            @click="navigate('admin-users')"
+                            :class="{
+                                active:
+                                currentPage ===
+                                'admin-users'
+                            }"
+                            @click="
+                                navigate(
+                                    'admin-users'
+                                )
+                            "
                         >
                             Users
                         </button>
@@ -2071,8 +2855,16 @@ createApp({
 
                         <button
                             class="nav-link text-start"
-                            :class="{active: currentPage==='admin-bookings'}"
-                            @click="navigate('admin-bookings')"
+                            :class="{
+                                active:
+                                currentPage ===
+                                'admin-bookings'
+                            }"
+                            @click="
+                                navigate(
+                                    'admin-bookings'
+                                )
+                            "
                         >
                             Bookings
                         </button>
@@ -2080,8 +2872,16 @@ createApp({
 
                         <button
                             class="nav-link text-start"
-                            :class="{active: currentPage==='admin-search'}"
-                            @click="navigate('admin-search')"
+                            :class="{
+                                active:
+                                currentPage ===
+                                'admin-search'
+                            }"
+                            @click="
+                                navigate(
+                                    'admin-search'
+                                )
+                            "
                         >
                             Search
                         </button>
@@ -2109,8 +2909,16 @@ createApp({
 
                         <button
                             class="nav-link text-start"
-                            :class="{active: currentPage==='staff-dashboard'}"
-                            @click="navigate('staff-dashboard')"
+                            :class="{
+                                active:
+                                currentPage ===
+                                'staff-dashboard'
+                            }"
+                            @click="
+                                navigate(
+                                    'staff-dashboard'
+                                )
+                            "
                         >
                             Dashboard
                         </button>
@@ -2120,11 +2928,16 @@ createApp({
                             class="nav-link text-start"
                             :class="{
                                 active:
-                                currentPage==='staff-treks'
-                                ||
-                                currentPage==='staff-manage-trek'
+                                currentPage ===
+                                'staff-treks' ||
+                                currentPage ===
+                                'staff-manage-trek'
                             }"
-                            @click="navigate('staff-treks')"
+                            @click="
+                                navigate(
+                                    'staff-treks'
+                                )
+                            "
                         >
                             My Treks
                         </button>
@@ -2132,8 +2945,16 @@ createApp({
 
                         <button
                             class="nav-link text-start"
-                            :class="{active: currentPage==='staff-participants'}"
-                            @click="navigate('staff-participants')"
+                            :class="{
+                                active:
+                                currentPage ===
+                                'staff-participants'
+                            }"
+                            @click="
+                                navigate(
+                                    'staff-participants'
+                                )
+                            "
                         >
                             Participants
                         </button>
@@ -2141,8 +2962,16 @@ createApp({
 
                         <button
                             class="nav-link text-start"
-                            :class="{active: currentPage==='staff-profile'}"
-                            @click="navigate('staff-profile')"
+                            :class="{
+                                active:
+                                currentPage ===
+                                'staff-profile'
+                            }"
+                            @click="
+                                navigate(
+                                    'staff-profile'
+                                )
+                            "
                         >
                             Profile
                         </button>
@@ -2170,8 +2999,16 @@ createApp({
 
                         <button
                             class="nav-link text-start"
-                            :class="{active: currentPage==='trekker-dashboard'}"
-                            @click="navigate('trekker-dashboard')"
+                            :class="{
+                                active:
+                                currentPage ===
+                                'trekker-dashboard'
+                            }"
+                            @click="
+                                navigate(
+                                    'trekker-dashboard'
+                                )
+                            "
                         >
                             Dashboard
                         </button>
@@ -2181,11 +3018,16 @@ createApp({
                             class="nav-link text-start"
                             :class="{
                                 active:
-                                currentPage==='trekker-treks'
-                                ||
-                                currentPage==='trekker-trek-details'
+                                currentPage ===
+                                'trekker-treks' ||
+                                currentPage ===
+                                'trekker-trek-details'
                             }"
-                            @click="navigate('trekker-treks')"
+                            @click="
+                                navigate(
+                                    'trekker-treks'
+                                )
+                            "
                         >
                             Browse Treks
                         </button>
@@ -2193,8 +3035,16 @@ createApp({
 
                         <button
                             class="nav-link text-start"
-                            :class="{active: currentPage==='trekker-bookings'}"
-                            @click="navigate('trekker-bookings')"
+                            :class="{
+                                active:
+                                currentPage ===
+                                'trekker-bookings'
+                            }"
+                            @click="
+                                navigate(
+                                    'trekker-bookings'
+                                )
+                            "
                         >
                             My Bookings
                         </button>
@@ -2202,8 +3052,16 @@ createApp({
 
                         <button
                             class="nav-link text-start"
-                            :class="{active: currentPage==='trekker-history'}"
-                            @click="navigate('trekker-history')"
+                            :class="{
+                                active:
+                                currentPage ===
+                                'trekker-history'
+                            }"
+                            @click="
+                                navigate(
+                                    'trekker-history'
+                                )
+                            "
                         >
                             History
                         </button>
@@ -2211,10 +3069,47 @@ createApp({
 
                         <button
                             class="nav-link text-start"
-                            :class="{active: currentPage==='trekker-profile'}"
-                            @click="navigate('trekker-profile')"
+                            :class="{
+                                active:
+                                currentPage ===
+                                'trekker-profile'
+                            }"
+                            @click="
+                                navigate(
+                                    'trekker-profile'
+                                )
+                            "
                         >
                             Profile
+                        </button>
+
+
+                        <button
+                            class="nav-link text-start"
+                            :class="{
+                                active:
+                                currentPage ===
+                                'trekker-notifications'
+                            }"
+                            @click="
+                                navigate(
+                                    'trekker-notifications'
+                                )
+                            "
+                        >
+
+                            Notifications
+
+
+                            <span
+                                v-if="
+                                    unreadNotifications > 0
+                                "
+                                class="badge bg-danger ms-1"
+                            >
+                                {{ unreadNotifications }}
+                            </span>
+
                         </button>
 
                     </aside>
@@ -2222,7 +3117,7 @@ createApp({
 
 
                     <!-- ================================================= -->
-                    <!-- MAIN -->
+                    <!-- MAIN CONTENT -->
                     <!-- ================================================= -->
 
                     <main
@@ -2252,7 +3147,10 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-if="currentPage==='admin-dashboard'"
+                            v-if="
+                                currentPage ===
+                                'admin-dashboard'
+                            "
                         >
 
                             <h2 class="fw-bold mb-4">
@@ -2262,8 +3160,11 @@ createApp({
 
                             <div class="row g-3">
 
+
                                 <div class="col-md-4 col-lg-2">
+
                                     <div class="card dashboard-card">
+
                                         <div class="card-body text-center">
 
                                             <h3>
@@ -2271,16 +3172,20 @@ createApp({
                                             </h3>
 
                                             <span class="text-muted">
-                                                Treks
+                                                Total Treks
                                             </span>
 
                                         </div>
+
                                     </div>
+
                                 </div>
 
 
                                 <div class="col-md-4 col-lg-2">
+
                                     <div class="card dashboard-card">
+
                                         <div class="card-body text-center">
 
                                             <h3>
@@ -2292,12 +3197,16 @@ createApp({
                                             </span>
 
                                         </div>
+
                                     </div>
+
                                 </div>
 
 
                                 <div class="col-md-4 col-lg-2">
+
                                     <div class="card dashboard-card">
+
                                         <div class="card-body text-center">
 
                                             <h3>
@@ -2309,12 +3218,16 @@ createApp({
                                             </span>
 
                                         </div>
+
                                     </div>
+
                                 </div>
 
 
                                 <div class="col-md-4 col-lg-2">
+
                                     <div class="card dashboard-card">
+
                                         <div class="card-body text-center">
 
                                             <h3>
@@ -2326,12 +3239,16 @@ createApp({
                                             </span>
 
                                         </div>
+
                                     </div>
+
                                 </div>
 
 
                                 <div class="col-md-4 col-lg-2">
+
                                     <div class="card dashboard-card">
+
                                         <div class="card-body text-center">
 
                                             <h3>
@@ -2343,12 +3260,16 @@ createApp({
                                             </span>
 
                                         </div>
+
                                     </div>
+
                                 </div>
 
 
                                 <div class="col-md-4 col-lg-2">
+
                                     <div class="card dashboard-card">
+
                                         <div class="card-body text-center">
 
                                             <h3>
@@ -2360,7 +3281,9 @@ createApp({
                                             </span>
 
                                         </div>
+
                                     </div>
+
                                 </div>
 
                             </div>
@@ -2374,7 +3297,10 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="currentPage==='admin-treks'"
+                            v-else-if="
+                                currentPage ===
+                                'admin-treks'
+                            "
                         >
 
                             <h2 class="fw-bold">
@@ -2389,7 +3315,8 @@ createApp({
                                     <h5>
 
                                         {{
-                                            trekFormMode === 'create'
+                                            trekFormMode ===
+                                            'create'
                                             ? 'Create New Trek'
                                             : 'Edit Trek'
                                         }}
@@ -2397,9 +3324,14 @@ createApp({
                                     </h5>
 
 
-                                    <form @submit.prevent="saveTrek">
+                                    <form
+                                        @submit.prevent="
+                                            saveTrek
+                                        "
+                                    >
 
                                         <div class="row g-3">
+
 
                                             <div class="col-md-6">
 
@@ -2439,9 +3371,19 @@ createApp({
                                                     v-model="trekForm.difficulty"
                                                     class="form-select"
                                                 >
-                                                    <option>Easy</option>
-                                                    <option>Moderate</option>
-                                                    <option>Hard</option>
+
+                                                    <option>
+                                                        Easy
+                                                    </option>
+
+                                                    <option>
+                                                        Moderate
+                                                    </option>
+
+                                                    <option>
+                                                        Hard
+                                                    </option>
+
                                                 </select>
 
                                             </div>
@@ -2519,12 +3461,31 @@ createApp({
                                                     v-model="trekForm.status"
                                                     class="form-select"
                                                 >
-                                                    <option>Pending</option>
-                                                    <option>Approved</option>
-                                                    <option>Open</option>
-                                                    <option>Closed</option>
-                                                    <option>Ongoing</option>
-                                                    <option>Completed</option>
+
+                                                    <option>
+                                                        Pending
+                                                    </option>
+
+                                                    <option>
+                                                        Approved
+                                                    </option>
+
+                                                    <option>
+                                                        Open
+                                                    </option>
+
+                                                    <option>
+                                                        Closed
+                                                    </option>
+
+                                                    <option>
+                                                        Ongoing
+                                                    </option>
+
+                                                    <option>
+                                                        Completed
+                                                    </option>
+
                                                 </select>
 
                                             </div>
@@ -2532,10 +3493,14 @@ createApp({
 
                                             <div class="col-12">
 
+                                                <label class="form-label">
+                                                    Description
+                                                </label>
+
                                                 <textarea
                                                     v-model.trim="trekForm.description"
                                                     class="form-control"
-                                                    placeholder="Description"
+                                                    rows="3"
                                                 ></textarea>
 
                                             </div>
@@ -2546,21 +3511,29 @@ createApp({
                                                 <button
                                                     class="btn btn-primary"
                                                 >
+
                                                     {{
-                                                        trekFormMode==='create'
+                                                        trekFormMode ===
+                                                        'create'
                                                         ? 'Create Trek'
                                                         : 'Save Changes'
                                                     }}
+
                                                 </button>
 
 
                                                 <button
-                                                    v-if="trekFormMode==='edit'"
+                                                    v-if="
+                                                        trekFormMode ===
+                                                        'edit'
+                                                    "
                                                     type="button"
                                                     class="btn btn-secondary ms-2"
-                                                    @click="resetTrekForm"
+                                                    @click="
+                                                        resetTrekForm
+                                                    "
                                                 >
-                                                    Cancel
+                                                    Cancel Edit
                                                 </button>
 
                                             </div>
@@ -2574,9 +3547,13 @@ createApp({
                             </div>
 
 
-                            <div class="table-responsive table-container">
+                            <div
+                                class="table-responsive table-container"
+                            >
 
-                                <table class="table table-hover">
+                                <table
+                                    class="table table-hover align-middle"
+                                >
 
                                     <thead>
 
@@ -2588,7 +3565,7 @@ createApp({
                                             <th>Slots</th>
                                             <th>Staff</th>
                                             <th>Status</th>
-                                            <th>Action</th>
+                                            <th>Actions</th>
                                         </tr>
 
                                     </thead>
@@ -2597,7 +3574,9 @@ createApp({
                                     <tbody>
 
                                         <tr
-                                            v-for="trek in treks"
+                                            v-for="
+                                                trek in treks
+                                            "
                                             :key="trek.id"
                                         >
 
@@ -2618,35 +3597,76 @@ createApp({
                                             </td>
 
                                             <td>
+
                                                 {{ trek.available_slots }}
+
                                                 /
+
                                                 {{ trek.total_slots }}
+
                                             </td>
 
                                             <td>
-                                                {{ trek.assigned_staff || 'Not Assigned' }}
+
+                                                {{
+                                                    trek.assigned_staff
+                                                    ||
+                                                    'Not Assigned'
+                                                }}
+
                                             </td>
 
                                             <td>
-                                                {{ trek.status }}
+
+                                                <span
+                                                    class="badge bg-secondary"
+                                                >
+                                                    {{ trek.status }}
+                                                </span>
+
                                             </td>
 
                                             <td>
 
                                                 <button
-                                                    class="btn btn-warning btn-sm me-1"
-                                                    @click="editTrek(trek)"
+                                                    class="btn btn-warning btn-sm me-2"
+                                                    @click="
+                                                        editTrek(
+                                                            trek
+                                                        )
+                                                    "
                                                 >
                                                     Edit
                                                 </button>
 
+
                                                 <button
                                                     class="btn btn-danger btn-sm"
-                                                    @click="deleteTrek(trek)"
+                                                    @click="
+                                                        deleteTrek(
+                                                            trek
+                                                        )
+                                                    "
                                                 >
                                                     Delete
                                                 </button>
 
+                                            </td>
+
+                                        </tr>
+
+
+                                        <tr
+                                            v-if="
+                                                treks.length === 0
+                                            "
+                                        >
+
+                                            <td
+                                                colspan="8"
+                                                class="text-center text-muted"
+                                            >
+                                                No treks found.
                                             </td>
 
                                         </tr>
@@ -2666,7 +3686,10 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="currentPage==='admin-staff'"
+                            v-else-if="
+                                currentPage ===
+                                'admin-staff'
+                            "
                         >
 
                             <h2 class="fw-bold">
@@ -2676,88 +3699,122 @@ createApp({
 
                             <div class="row g-4 my-4">
 
+
                                 <div class="col-lg-7">
 
                                     <div class="card dashboard-card">
 
                                         <div class="card-body">
 
-                                            <h5>Create Staff</h5>
+                                            <h5>
+                                                Create Staff
+                                            </h5>
 
 
-                                            <form @submit.prevent="createStaff">
+                                            <form
+                                                @submit.prevent="
+                                                    createStaff
+                                                "
+                                            >
 
                                                 <div class="row g-3">
 
+
                                                     <div class="col-md-6">
+
                                                         <input
-                                                            v-model="staffForm.name"
+                                                            v-model.trim="staffForm.name"
                                                             class="form-control"
                                                             placeholder="Name"
                                                         >
+
                                                     </div>
 
+
                                                     <div class="col-md-6">
+
                                                         <input
-                                                            v-model="staffForm.email"
+                                                            v-model.trim="staffForm.email"
+                                                            type="email"
                                                             class="form-control"
                                                             placeholder="Email"
                                                         >
+
                                                     </div>
 
+
                                                     <div class="col-md-6">
+
                                                         <input
                                                             v-model="staffForm.password"
                                                             type="password"
                                                             class="form-control"
                                                             placeholder="Password"
                                                         >
+
                                                     </div>
 
+
                                                     <div class="col-md-6">
+
                                                         <input
-                                                            v-model="staffForm.phone"
+                                                            v-model.trim="staffForm.phone"
                                                             class="form-control"
                                                             placeholder="Phone"
                                                         >
+
                                                     </div>
 
+
                                                     <div class="col-md-6">
+
                                                         <input
-                                                            v-model="staffForm.experience"
+                                                            v-model.trim="staffForm.experience"
                                                             class="form-control"
                                                             placeholder="Experience"
                                                         >
+
                                                     </div>
 
+
                                                     <div class="col-md-6">
+
                                                         <input
-                                                            v-model="staffForm.specialization"
+                                                            v-model.trim="staffForm.specialization"
                                                             class="form-control"
                                                             placeholder="Specialization"
                                                         >
+
                                                     </div>
 
+
                                                     <div class="col-md-6">
+
                                                         <input
-                                                            v-model="staffForm.emergency_contact"
+                                                            v-model.trim="staffForm.emergency_contact"
                                                             class="form-control"
                                                             placeholder="Emergency Contact"
                                                         >
+
                                                     </div>
 
+
                                                     <div class="col-md-6">
+
                                                         <input
-                                                            v-model="staffForm.address"
+                                                            v-model.trim="staffForm.address"
                                                             class="form-control"
                                                             placeholder="Address"
                                                         >
+
                                                     </div>
 
 
                                                     <div class="col-12">
 
-                                                        <button class="btn btn-success">
+                                                        <button
+                                                            class="btn btn-success"
+                                                        >
                                                             Create Staff
                                                         </button>
 
@@ -2774,6 +3831,7 @@ createApp({
                                 </div>
 
 
+
                                 <div class="col-lg-5">
 
                                     <div class="card dashboard-card">
@@ -2786,7 +3844,9 @@ createApp({
 
 
                                             <select
-                                                v-model="assignForm.trek_id"
+                                                v-model="
+                                                    assignForm.trek_id
+                                                "
                                                 class="form-select mb-3"
                                             >
 
@@ -2794,8 +3854,12 @@ createApp({
                                                     Select Trek
                                                 </option>
 
+
                                                 <option
-                                                    v-for="trek in treks"
+                                                    v-for="
+                                                        trek in treks
+                                                    "
+                                                    :key="trek.id"
                                                     :value="trek.id"
                                                 >
                                                     {{ trek.name }}
@@ -2805,7 +3869,9 @@ createApp({
 
 
                                             <select
-                                                v-model="assignForm.staff_id"
+                                                v-model="
+                                                    assignForm.staff_id
+                                                "
                                                 class="form-select mb-3"
                                             >
 
@@ -2813,8 +3879,12 @@ createApp({
                                                     Select Staff
                                                 </option>
 
+
                                                 <option
-                                                    v-for="person in staff"
+                                                    v-for="
+                                                        person in staff
+                                                    "
+                                                    :key="person.id"
                                                     :value="person.id"
                                                 >
                                                     {{ person.name }}
@@ -2825,9 +3895,11 @@ createApp({
 
                                             <button
                                                 class="btn btn-primary"
-                                                @click="assignStaff"
+                                                @click="
+                                                    assignStaff
+                                                "
                                             >
-                                                Assign
+                                                Assign Staff
                                             </button>
 
                                         </div>
@@ -2839,37 +3911,55 @@ createApp({
                             </div>
 
 
-                            <div class="table-responsive table-container">
+                            <div
+                                class="table-responsive table-container"
+                            >
 
                                 <table class="table">
 
                                     <thead>
+
                                         <tr>
                                             <th>ID</th>
                                             <th>Name</th>
                                             <th>Email</th>
                                             <th>Specialization</th>
-                                            <th>Assigned</th>
+                                            <th>Assigned Treks</th>
                                             <th>Status</th>
                                         </tr>
+
                                     </thead>
 
 
                                     <tbody>
 
                                         <tr
-                                            v-for="person in staff"
+                                            v-for="
+                                                person in staff
+                                            "
                                             :key="person.id"
                                         >
 
-                                            <td>{{ person.id }}</td>
-
-                                            <td>{{ person.name }}</td>
-
-                                            <td>{{ person.email }}</td>
+                                            <td>
+                                                {{ person.id }}
+                                            </td>
 
                                             <td>
-                                                {{ person.specialization || '-' }}
+                                                {{ person.name }}
+                                            </td>
+
+                                            <td>
+                                                {{ person.email }}
+                                            </td>
+
+                                            <td>
+
+                                                {{
+                                                    person.specialization
+                                                    ||
+                                                    '-'
+                                                }}
+
                                             </td>
 
                                             <td>
@@ -2879,18 +3969,24 @@ createApp({
                                             <td>
 
                                                 <span
-                                                    v-if="person.is_blacklisted"
+                                                    v-if="
+                                                        person.is_blacklisted
+                                                    "
                                                     class="badge bg-danger"
                                                 >
                                                     Blacklisted
                                                 </span>
 
+
                                                 <span
-                                                    v-else-if="person.is_active"
+                                                    v-else-if="
+                                                        person.is_active
+                                                    "
                                                     class="badge bg-success"
                                                 >
                                                     Active
                                                 </span>
+
 
                                                 <span
                                                     v-else
@@ -2918,7 +4014,10 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="currentPage==='admin-users'"
+                            v-else-if="
+                                currentPage ===
+                                'admin-users'
+                            "
                         >
 
                             <h2 class="fw-bold mb-4">
@@ -2926,11 +4025,14 @@ createApp({
                             </h2>
 
 
-                            <div class="table-responsive table-container">
+                            <div
+                                class="table-responsive table-container"
+                            >
 
-                                <table class="table">
+                                <table class="table table-hover">
 
                                     <thead>
+
                                         <tr>
                                             <th>ID</th>
                                             <th>Name</th>
@@ -2940,60 +4042,112 @@ createApp({
                                             <th>Blacklisted</th>
                                             <th>Actions</th>
                                         </tr>
+
                                     </thead>
 
 
                                     <tbody>
 
                                         <tr
-                                            v-for="user in users"
+                                            v-for="
+                                                user in users
+                                            "
                                             :key="user.id"
                                         >
 
-                                            <td>{{ user.id }}</td>
-                                            <td>{{ user.name }}</td>
-                                            <td>{{ user.role }}</td>
-                                            <td>{{ user.email }}</td>
-
                                             <td>
-                                                {{ user.is_active ? 'Yes' : 'No' }}
+                                                {{ user.id }}
                                             </td>
 
                                             <td>
-                                                {{ user.is_blacklisted ? 'Yes' : 'No' }}
+                                                {{ user.name }}
+                                            </td>
+
+                                            <td>
+                                                {{ user.role }}
+                                            </td>
+
+                                            <td>
+                                                {{ user.email }}
+                                            </td>
+
+                                            <td>
+
+                                                {{
+                                                    user.is_active
+                                                    ? 'Yes'
+                                                    : 'No'
+                                                }}
+
+                                            </td>
+
+                                            <td>
+
+                                                {{
+                                                    user.is_blacklisted
+                                                    ? 'Yes'
+                                                    : 'No'
+                                                }}
+
                                             </td>
 
                                             <td>
 
                                                 <button
-                                                    v-if="user.is_active"
+                                                    v-if="
+                                                        user.is_active
+                                                    "
                                                     class="btn btn-secondary btn-sm me-1"
-                                                    @click="setUserActive(user,false)"
+                                                    @click="
+                                                        setUserActive(
+                                                            user,
+                                                            false
+                                                        )
+                                                    "
                                                 >
                                                     Deactivate
                                                 </button>
 
+
                                                 <button
                                                     v-else
                                                     class="btn btn-success btn-sm me-1"
-                                                    @click="setUserActive(user,true)"
+                                                    @click="
+                                                        setUserActive(
+                                                            user,
+                                                            true
+                                                        )
+                                                    "
                                                 >
                                                     Activate
                                                 </button>
 
 
                                                 <button
-                                                    v-if="!user.is_blacklisted"
+                                                    v-if="
+                                                        !user.is_blacklisted
+                                                    "
                                                     class="btn btn-danger btn-sm"
-                                                    @click="setUserBlacklist(user,true)"
+                                                    @click="
+                                                        setUserBlacklist(
+                                                            user,
+                                                            true
+                                                        )
+                                                    "
                                                 >
                                                     Blacklist
                                                 </button>
 
+
                                                 <button
                                                     v-else
                                                     class="btn btn-warning btn-sm"
-                                                    @click="setUserBlacklist(user,false)"
+                                                    @click="
+                                                        setUserBlacklist(
+                                                            user,
+                                                            false
+                                                        )
+                                                    "
                                                 >
                                                     Remove Blacklist
                                                 </button>
@@ -3017,7 +4171,10 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="currentPage==='admin-bookings'"
+                            v-else-if="
+                                currentPage ===
+                                'admin-bookings'
+                            "
                         >
 
                             <h2 class="fw-bold mb-4">
@@ -3025,11 +4182,14 @@ createApp({
                             </h2>
 
 
-                            <div class="table-responsive table-container">
+                            <div
+                                class="table-responsive table-container"
+                            >
 
                                 <table class="table">
 
                                     <thead>
+
                                         <tr>
                                             <th>ID</th>
                                             <th>User</th>
@@ -3038,17 +4198,22 @@ createApp({
                                             <th>Status</th>
                                             <th>Payment</th>
                                         </tr>
+
                                     </thead>
 
 
                                     <tbody>
 
                                         <tr
-                                            v-for="booking in bookings"
+                                            v-for="
+                                                booking in bookings
+                                            "
                                             :key="booking.id"
                                         >
 
-                                            <td>{{ booking.id }}</td>
+                                            <td>
+                                                {{ booking.id }}
+                                            </td>
 
                                             <td>
                                                 {{ booking.user_name }}
@@ -3073,13 +4238,17 @@ createApp({
                                         </tr>
 
 
-                                        <tr v-if="bookings.length===0">
+                                        <tr
+                                            v-if="
+                                                bookings.length === 0
+                                            "
+                                        >
 
                                             <td
                                                 colspan="6"
                                                 class="text-center text-muted"
                                             >
-                                                No bookings.
+                                                No bookings yet.
                                             </td>
 
                                         </tr>
@@ -3099,7 +4268,10 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="currentPage==='admin-search'"
+                            v-else-if="
+                                currentPage ===
+                                'admin-search'
+                            "
                         >
 
                             <h2 class="fw-bold">
@@ -3107,18 +4279,27 @@ createApp({
                             </h2>
 
 
-                            <div class="input-group my-4">
+                            <div
+                                class="input-group my-4"
+                            >
 
                                 <input
-                                    v-model="searchQuery"
+                                    v-model.trim="
+                                        searchQuery
+                                    "
                                     class="form-control"
-                                    @keyup.enter="performSearch"
-                                    placeholder="Search by name or ID"
+                                    placeholder="Search trek, user or staff..."
+                                    @keyup.enter="
+                                        performSearch
+                                    "
                                 >
+
 
                                 <button
                                     class="btn btn-primary"
-                                    @click="performSearch"
+                                    @click="
+                                        performSearch
+                                    "
                                 >
                                     Search
                                 </button>
@@ -3126,21 +4307,33 @@ createApp({
                             </div>
 
 
-                            <h5>Treks</h5>
+                            <h5>
+                                Treks
+                            </h5>
+
 
                             <div
-                                v-for="trek in searchResults.treks"
+                                v-for="
+                                    trek in searchResults.treks
+                                "
+                                :key="
+                                    'trek-' + trek.id
+                                "
                                 class="card mb-2"
                             >
+
                                 <div class="card-body">
 
-                                    {{ trek.id }}
-                                    —
-                                    {{ trek.name }}
-                                    —
+                                    <strong>
+                                        {{ trek.name }}
+                                    </strong>
+
+                                    -
+
                                     {{ trek.location }}
 
                                 </div>
+
                             </div>
 
 
@@ -3148,19 +4341,29 @@ createApp({
                                 Trekkers
                             </h5>
 
+
                             <div
-                                v-for="user in searchResults.users"
+                                v-for="
+                                    user in searchResults.users
+                                "
+                                :key="
+                                    'user-' + user.id
+                                "
                                 class="card mb-2"
                             >
+
                                 <div class="card-body">
 
-                                    {{ user.id }}
-                                    —
-                                    {{ user.name }}
-                                    —
+                                    <strong>
+                                        {{ user.name }}
+                                    </strong>
+
+                                    -
+
                                     {{ user.email }}
 
                                 </div>
+
                             </div>
 
 
@@ -3168,19 +4371,29 @@ createApp({
                                 Staff
                             </h5>
 
+
                             <div
-                                v-for="person in searchResults.staff"
+                                v-for="
+                                    person in searchResults.staff
+                                "
+                                :key="
+                                    'staff-' + person.id
+                                "
                                 class="card mb-2"
                             >
+
                                 <div class="card-body">
 
-                                    {{ person.id }}
-                                    —
-                                    {{ person.name }}
-                                    —
+                                    <strong>
+                                        {{ person.name }}
+                                    </strong>
+
+                                    -
+
                                     {{ person.email }}
 
                                 </div>
+
                             </div>
 
                         </div>
@@ -3192,7 +4405,10 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="currentPage==='staff-dashboard'"
+                            v-else-if="
+                                currentPage ===
+                                'staff-dashboard'
+                            "
                         >
 
                             <h2 class="fw-bold">
@@ -3200,10 +4416,18 @@ createApp({
                             </h2>
 
 
+                            <p class="text-muted">
+                                Manage your assigned trekking routes.
+                            </p>
+
+
                             <div class="row g-3 mt-3">
 
+
                                 <div class="col">
+
                                     <div class="card dashboard-card">
+
                                         <div class="card-body text-center">
 
                                             <h3>
@@ -3213,12 +4437,16 @@ createApp({
                                             Assigned Treks
 
                                         </div>
+
                                     </div>
+
                                 </div>
 
 
                                 <div class="col">
+
                                     <div class="card dashboard-card">
+
                                         <div class="card-body text-center">
 
                                             <h3>
@@ -3228,12 +4456,16 @@ createApp({
                                             Open
 
                                         </div>
+
                                     </div>
+
                                 </div>
 
 
                                 <div class="col">
+
                                     <div class="card dashboard-card">
+
                                         <div class="card-body text-center">
 
                                             <h3>
@@ -3243,12 +4475,16 @@ createApp({
                                             Ongoing
 
                                         </div>
+
                                     </div>
+
                                 </div>
 
 
                                 <div class="col">
+
                                     <div class="card dashboard-card">
+
                                         <div class="card-body text-center">
 
                                             <h3>
@@ -3258,12 +4494,16 @@ createApp({
                                             Completed
 
                                         </div>
+
                                     </div>
+
                                 </div>
 
 
                                 <div class="col">
+
                                     <div class="card dashboard-card">
+
                                         <div class="card-body text-center">
 
                                             <h3>
@@ -3273,7 +4513,9 @@ createApp({
                                             Participants
 
                                         </div>
+
                                     </div>
+
                                 </div>
 
                             </div>
@@ -3287,7 +4529,10 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="currentPage==='staff-treks'"
+                            v-else-if="
+                                currentPage ===
+                                'staff-treks'
+                            "
                         >
 
                             <h2 class="fw-bold">
@@ -3297,8 +4542,11 @@ createApp({
 
                             <div class="row g-4 mt-2">
 
+
                                 <div
-                                    v-for="trek in staffTreks"
+                                    v-for="
+                                        trek in staffTreks
+                                    "
                                     :key="trek.id"
                                     class="col-lg-6"
                                 >
@@ -3311,44 +4559,68 @@ createApp({
                                                 {{ trek.name }}
                                             </h4>
 
+
                                             <p class="text-muted">
                                                 {{ trek.location }}
                                             </p>
 
 
                                             <p>
-                                                Status:
+
                                                 <strong>
-                                                    {{ trek.status }}
+                                                    Status:
                                                 </strong>
+
+                                                {{ trek.status }}
+
                                             </p>
 
 
                                             <p>
-                                                Slots:
+
+                                                <strong>
+                                                    Slots:
+                                                </strong>
+
                                                 {{ trek.available_slots }}
+
                                                 /
+
                                                 {{ trek.total_slots }}
+
                                             </p>
 
 
                                             <p>
-                                                Participants:
+
+                                                <strong>
+                                                    Participants:
+                                                </strong>
+
                                                 {{ trek.participant_count }}
+
                                             </p>
 
 
                                             <button
                                                 class="btn btn-primary me-2"
-                                                @click="selectStaffTrek(trek)"
+                                                @click="
+                                                    selectStaffTrek(
+                                                        trek
+                                                    )
+                                                "
                                             >
-                                                Manage
+                                                Manage Trek
                                             </button>
 
 
                                             <button
                                                 class="btn btn-outline-secondary"
-                                                @click="viewTrekParticipants(trek)"
+                                                @click="
+                                                    viewTrekParticipants(
+                                                        trek
+                                                    )
+                                                "
                                             >
                                                 Participants
                                             </button>
@@ -3361,10 +4633,18 @@ createApp({
 
 
                                 <div
-                                    v-if="staffTreks.length===0"
-                                    class="alert alert-info"
+                                    v-if="
+                                        staffTreks.length === 0
+                                    "
+                                    class="col-12"
                                 >
-                                    No assigned treks.
+
+                                    <div
+                                        class="alert alert-info"
+                                    >
+                                        No treks assigned to you.
+                                    </div>
+
                                 </div>
 
                             </div>
@@ -3378,22 +4658,40 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="currentPage==='staff-manage-trek'"
+                            v-else-if="
+                                currentPage ===
+                                'staff-manage-trek'
+                            "
                         >
 
                             <button
                                 class="btn btn-outline-secondary mb-3"
-                                @click="navigate('staff-treks')"
+                                @click="
+                                    navigate(
+                                        'staff-treks'
+                                    )
+                                "
                             >
                                 ← Back
                             </button>
 
 
-                            <div v-if="selectedStaffTrek">
+                            <div
+                                v-if="
+                                    selectedStaffTrek
+                                "
+                            >
 
-                                <h2>
+                                <h2 class="fw-bold">
+
                                     {{ selectedStaffTrek.name }}
+
                                 </h2>
+
+
+                                <p class="text-muted">
+                                    {{ selectedStaffTrek.location }}
+                                </p>
 
 
                                 <div class="row g-4">
@@ -3409,26 +4707,54 @@ createApp({
                                                     Trek Information
                                                 </h5>
 
-                                                <p>
-                                                    Location:
-                                                    {{ selectedStaffTrek.location }}
-                                                </p>
 
                                                 <p>
-                                                    Difficulty:
+
+                                                    <strong>
+                                                        Difficulty:
+                                                    </strong>
+
                                                     {{ selectedStaffTrek.difficulty }}
+
                                                 </p>
 
+
                                                 <p>
-                                                    Status:
+
+                                                    <strong>
+                                                        Duration:
+                                                    </strong>
+
+                                                    {{ selectedStaffTrek.duration }}
+
+                                                    days
+
+                                                </p>
+
+
+                                                <p>
+
+                                                    <strong>
+                                                        Status:
+                                                    </strong>
+
                                                     {{ selectedStaffTrek.status }}
+
                                                 </p>
 
+
                                                 <p>
-                                                    Slots:
+
+                                                    <strong>
+                                                        Slots:
+                                                    </strong>
+
                                                     {{ selectedStaffTrek.available_slots }}
+
                                                     /
+
                                                     {{ selectedStaffTrek.total_slots }}
+
                                                 </p>
 
                                             </div>
@@ -3438,25 +4764,35 @@ createApp({
                                     </div>
 
 
+
                                     <div class="col-md-6">
 
-                                        <div class="card dashboard-card mb-3">
+                                        <div
+                                            class="card dashboard-card mb-3"
+                                        >
 
                                             <div class="card-body">
 
                                                 <h5>
-                                                    Slots
+                                                    Update Slots
                                                 </h5>
 
+
                                                 <input
-                                                    v-model.number="staffSlotForm.total_slots"
+                                                    v-model.number="
+                                                        staffSlotForm.total_slots
+                                                    "
                                                     type="number"
-                                                    class="form-control mb-2"
+                                                    min="1"
+                                                    class="form-control mb-3"
                                                 >
+
 
                                                 <button
                                                     class="btn btn-primary"
-                                                    @click="updateStaffSlots"
+                                                    @click="
+                                                        updateStaffSlots
+                                                    "
                                                 >
                                                     Update Slots
                                                 </button>
@@ -3466,39 +4802,60 @@ createApp({
                                         </div>
 
 
-                                        <div class="card dashboard-card">
+                                        <div
+                                            class="card dashboard-card"
+                                        >
 
                                             <div class="card-body">
 
                                                 <h5>
-                                                    Status
+                                                    Trek Status
                                                 </h5>
 
 
                                                 <button
                                                     class="btn btn-success me-1 mb-1"
-                                                    @click="updateStaffStatus('Open')"
+                                                    @click="
+                                                        updateStaffStatus(
+                                                            'Open'
+                                                        )
+                                                    "
                                                 >
                                                     Open
                                                 </button>
 
+
                                                 <button
                                                     class="btn btn-secondary me-1 mb-1"
-                                                    @click="updateStaffStatus('Closed')"
+                                                    @click="
+                                                        updateStaffStatus(
+                                                            'Closed'
+                                                        )
+                                                    "
                                                 >
                                                     Close
                                                 </button>
 
+
                                                 <button
                                                     class="btn btn-warning me-1 mb-1"
-                                                    @click="updateStaffStatus('Ongoing')"
+                                                    @click="
+                                                        updateStaffStatus(
+                                                            'Ongoing'
+                                                        )
+                                                    "
                                                 >
                                                     Ongoing
                                                 </button>
 
+
                                                 <button
                                                     class="btn btn-primary mb-1"
-                                                    @click="updateStaffStatus('Completed')"
+                                                    @click="
+                                                        updateStaffStatus(
+                                                            'Completed'
+                                                        )
+                                                    "
                                                 >
                                                     Complete
                                                 </button>
@@ -3522,7 +4879,10 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="currentPage==='staff-participants'"
+                            v-else-if="
+                                currentPage ===
+                                'staff-participants'
+                            "
                         >
 
                             <h2 class="fw-bold">
@@ -3530,11 +4890,14 @@ createApp({
                             </h2>
 
 
-                            <div class="table-responsive table-container mt-3">
+                            <div
+                                class="table-responsive table-container mt-4"
+                            >
 
                                 <table class="table">
 
                                     <thead>
+
                                         <tr>
                                             <th>Booking</th>
                                             <th>Name</th>
@@ -3542,36 +4905,68 @@ createApp({
                                             <th>Phone</th>
                                             <th>Trek</th>
                                             <th>Status</th>
+                                            <th>Payment</th>
                                         </tr>
+
                                     </thead>
 
 
                                     <tbody>
 
                                         <tr
-                                            v-for="p in staffParticipants"
-                                            :key="p.booking_id"
+                                            v-for="
+                                                participant
+                                                in staffParticipants
+                                            "
+                                            :key="
+                                                participant.booking_id
+                                            "
                                         >
 
                                             <td>
-                                                {{ p.booking_id }}
+                                                #{{ participant.booking_id }}
                                             </td>
 
-                                            <td>
-                                                {{ p.user_name || p.name }}
-                                            </td>
 
                                             <td>
-                                                {{ p.user_email || p.email }}
-                                            </td>
 
-                                            <td>
-                                                {{ p.user_phone || p.phone || '-' }}
-                                            </td>
-
-                                            <td>
                                                 {{
-                                                    p.trek_name
+                                                    participant.user_name
+                                                    ||
+                                                    participant.name
+                                                }}
+
+                                            </td>
+
+
+                                            <td>
+
+                                                {{
+                                                    participant.user_email
+                                                    ||
+                                                    participant.email
+                                                }}
+
+                                            </td>
+
+
+                                            <td>
+
+                                                {{
+                                                    participant.user_phone
+                                                    ||
+                                                    participant.phone
+                                                    ||
+                                                    '-'
+                                                }}
+
+                                            </td>
+
+
+                                            <td>
+
+                                                {{
+                                                    participant.trek_name
                                                     ||
                                                     (
                                                         selectedStaffTrek
@@ -3579,24 +4974,35 @@ createApp({
                                                         : '-'
                                                     )
                                                 }}
+
                                             </td>
 
+
                                             <td>
-                                                {{ p.booking_status }}
+                                                {{ participant.booking_status }}
+                                            </td>
+
+
+                                            <td>
+                                                {{ participant.payment_status }}
                                             </td>
 
                                         </tr>
 
 
                                         <tr
-                                            v-if="staffParticipants.length===0"
+                                            v-if="
+                                                staffParticipants.length === 0
+                                            "
                                         >
+
                                             <td
-                                                colspan="6"
+                                                colspan="7"
                                                 class="text-center text-muted"
                                             >
                                                 No participants.
                                             </td>
+
                                         </tr>
 
                                     </tbody>
@@ -3614,54 +5020,100 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="currentPage==='staff-profile'"
+                            v-else-if="
+                                currentPage ===
+                                'staff-profile'
+                            "
                         >
 
-                            <h2>
+                            <h2 class="fw-bold">
                                 Staff Profile
                             </h2>
 
 
                             <div
-                                v-if="staffProfile"
-                                class="card dashboard-card mt-3"
+                                v-if="
+                                    staffProfile
+                                "
+                                class="card dashboard-card mt-4"
                             >
 
                                 <div class="card-body">
 
                                     <p>
-                                        <strong>Name:</strong>
+
+                                        <strong>
+                                            Name:
+                                        </strong>
+
                                         {{ staffProfile.name }}
+
                                     </p>
 
+
                                     <p>
-                                        <strong>Email:</strong>
+
+                                        <strong>
+                                            Email:
+                                        </strong>
+
                                         {{ staffProfile.email }}
+
                                     </p>
 
+
                                     <p>
-                                        <strong>Phone:</strong>
+
+                                        <strong>
+                                            Phone:
+                                        </strong>
+
                                         {{ staffProfile.phone || '-' }}
+
                                     </p>
 
+
                                     <p>
-                                        <strong>Experience:</strong>
+
+                                        <strong>
+                                            Experience:
+                                        </strong>
+
                                         {{ staffProfile.experience || '-' }}
+
                                     </p>
 
+
                                     <p>
-                                        <strong>Specialization:</strong>
+
+                                        <strong>
+                                            Specialization:
+                                        </strong>
+
                                         {{ staffProfile.specialization || '-' }}
+
                                     </p>
 
+
                                     <p>
-                                        <strong>Emergency:</strong>
+
+                                        <strong>
+                                            Emergency Contact:
+                                        </strong>
+
                                         {{ staffProfile.emergency_contact || '-' }}
+
                                     </p>
 
+
                                     <p>
-                                        <strong>Address:</strong>
+
+                                        <strong>
+                                            Address:
+                                        </strong>
+
                                         {{ staffProfile.address || '-' }}
+
                                     </p>
 
                                 </div>
@@ -3677,12 +5129,16 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="currentPage==='trekker-dashboard'"
+                            v-else-if="
+                                currentPage ===
+                                'trekker-dashboard'
+                            "
                         >
 
                             <h2 class="fw-bold">
                                 Trekker Dashboard
                             </h2>
+
 
                             <p class="text-muted">
                                 Welcome {{ currentUser.name }}
@@ -3780,7 +5236,11 @@ createApp({
 
                             <button
                                 class="btn btn-primary mt-4"
-                                @click="navigate('trekker-treks')"
+                                @click="
+                                    navigate(
+                                        'trekker-treks'
+                                    )
+                                "
                             >
                                 Browse Available Treks
                             </button>
@@ -3790,25 +5250,29 @@ createApp({
 
 
                         <!-- ============================================= -->
-                        <!-- TREKKER BROWSE TREKS -->
+                        <!-- TREKKER BROWSE -->
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="currentPage==='trekker-treks'"
+                            v-else-if="
+                                currentPage ===
+                                'trekker-treks'
+                            "
                         >
 
                             <h2 class="fw-bold">
                                 Browse Treks
                             </h2>
 
+
                             <p class="text-muted">
-                                Only Open treks are available for booking.
+                                Only Open treks can be booked.
                             </p>
 
 
-                            <!-- FILTERS -->
-
-                            <div class="card dashboard-card my-4">
+                            <div
+                                class="card dashboard-card my-4"
+                            >
 
                                 <div class="card-body">
 
@@ -3823,10 +5287,14 @@ createApp({
                                         <div class="col-md-3">
 
                                             <input
-                                                v-model="trekFilters.search"
+                                                v-model="
+                                                    trekFilters.search
+                                                "
                                                 class="form-control"
                                                 placeholder="Search trek..."
-                                                @keyup.enter="loadAvailableTreks"
+                                                @keyup.enter="
+                                                    loadAvailableTreks
+                                                "
                                             >
 
                                         </div>
@@ -3835,7 +5303,9 @@ createApp({
                                         <div class="col-md-3">
 
                                             <select
-                                                v-model="trekFilters.difficulty"
+                                                v-model="
+                                                    trekFilters.difficulty
+                                                "
                                                 class="form-select"
                                             >
 
@@ -3863,7 +5333,9 @@ createApp({
                                         <div class="col-md-3">
 
                                             <input
-                                                v-model="trekFilters.location"
+                                                v-model="
+                                                    trekFilters.location
+                                                "
                                                 class="form-control"
                                                 placeholder="Location"
                                             >
@@ -3874,11 +5346,13 @@ createApp({
                                         <div class="col-md-3">
 
                                             <input
-                                                v-model="trekFilters.duration"
+                                                v-model="
+                                                    trekFilters.duration
+                                                "
                                                 type="number"
                                                 min="1"
                                                 class="form-control"
-                                                placeholder="Max days"
+                                                placeholder="Max duration"
                                             >
 
                                         </div>
@@ -3888,7 +5362,9 @@ createApp({
 
                                             <button
                                                 class="btn btn-primary me-2"
-                                                @click="loadAvailableTreks"
+                                                @click="
+                                                    loadAvailableTreks
+                                                "
                                             >
                                                 Apply Filters
                                             </button>
@@ -3896,7 +5372,9 @@ createApp({
 
                                             <button
                                                 class="btn btn-outline-secondary"
-                                                @click="clearTrekFilters"
+                                                @click="
+                                                    clearTrekFilters
+                                                "
                                             >
                                                 Clear
                                             </button>
@@ -3910,19 +5388,20 @@ createApp({
                             </div>
 
 
-
-                            <!-- TREKS -->
-
                             <div class="row g-4">
 
 
                                 <div
-                                    v-for="trek in availableTreks"
+                                    v-for="
+                                        trek in availableTreks
+                                    "
                                     :key="trek.id"
                                     class="col-lg-6"
                                 >
 
-                                    <div class="card dashboard-card h-100">
+                                    <div
+                                        class="card dashboard-card h-100"
+                                    >
 
                                         <div class="card-body">
 
@@ -3956,41 +5435,77 @@ createApp({
 
 
                                             <p>
-                                                <strong>Difficulty:</strong>
+
+                                                <strong>
+                                                    Difficulty:
+                                                </strong>
+
                                                 {{ trek.difficulty }}
+
                                             </p>
 
 
                                             <p>
-                                                <strong>Duration:</strong>
+
+                                                <strong>
+                                                    Duration:
+                                                </strong>
+
                                                 {{ trek.duration }}
+
                                                 days
+
                                             </p>
 
 
                                             <p>
-                                                <strong>Available Slots:</strong>
+
+                                                <strong>
+                                                    Slots:
+                                                </strong>
+
                                                 {{ trek.available_slots }}
+
                                                 /
+
                                                 {{ trek.total_slots }}
+
                                             </p>
 
 
                                             <p>
-                                                <strong>Start:</strong>
+
+                                                <strong>
+                                                    Start:
+                                                </strong>
+
                                                 {{ trek.start_date || '-' }}
+
                                             </p>
 
 
                                             <p>
-                                                <strong>Staff:</strong>
-                                                {{ trek.assigned_staff || 'Not Assigned' }}
+
+                                                <strong>
+                                                    Staff:
+                                                </strong>
+
+                                                {{
+                                                    trek.assigned_staff
+                                                    ||
+                                                    'Not Assigned'
+                                                }}
+
                                             </p>
 
 
                                             <button
                                                 class="btn btn-outline-primary me-2"
-                                                @click="viewTrekDetails(trek)"
+                                                @click="
+                                                    viewTrekDetails(
+                                                        trek
+                                                    )
+                                                "
                                             >
                                                 View Details
                                             </button>
@@ -3998,14 +5513,22 @@ createApp({
 
                                             <button
                                                 class="btn btn-success"
-                                                :disabled="trek.available_slots <= 0"
-                                                @click="bookTrek(trek)"
+                                                :disabled="
+                                                    trek.available_slots <= 0
+                                                "
+                                                @click="
+                                                    bookTrek(
+                                                        trek
+                                                    )
+                                                "
                                             >
+
                                                 {{
                                                     trek.available_slots > 0
                                                     ? 'Book Trek'
                                                     : 'Full'
                                                 }}
+
                                             </button>
 
                                         </div>
@@ -4016,11 +5539,15 @@ createApp({
 
 
                                 <div
-                                    v-if="availableTreks.length===0"
+                                    v-if="
+                                        availableTreks.length === 0
+                                    "
                                     class="col-12"
                                 >
 
-                                    <div class="alert alert-info">
+                                    <div
+                                        class="alert alert-info"
+                                    >
                                         No matching Open treks found.
                                     </div>
 
@@ -4033,24 +5560,37 @@ createApp({
 
 
                         <!-- ============================================= -->
-                        <!-- TREK DETAILS -->
+                        <!-- TREKKER TREK DETAILS -->
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="currentPage==='trekker-trek-details'"
+                            v-else-if="
+                                currentPage ===
+                                'trekker-trek-details'
+                            "
                         >
 
                             <button
                                 class="btn btn-outline-secondary mb-3"
-                                @click="navigate('trekker-treks')"
+                                @click="
+                                    navigate(
+                                        'trekker-treks'
+                                    )
+                                "
                             >
                                 ← Back to Treks
                             </button>
 
 
-                            <div v-if="selectedTrek">
+                            <div
+                                v-if="
+                                    selectedTrek
+                                "
+                            >
 
-                                <div class="card dashboard-card">
+                                <div
+                                    class="card dashboard-card"
+                                >
 
                                     <div class="card-body">
 
@@ -4069,29 +5609,56 @@ createApp({
 
                                         <div class="row">
 
+
                                             <div class="col-md-6">
 
                                                 <p>
-                                                    <strong>Difficulty:</strong>
+
+                                                    <strong>
+                                                        Difficulty:
+                                                    </strong>
+
                                                     {{ selectedTrek.difficulty }}
+
                                                 </p>
 
+
                                                 <p>
-                                                    <strong>Duration:</strong>
+
+                                                    <strong>
+                                                        Duration:
+                                                    </strong>
+
                                                     {{ selectedTrek.duration }}
+
                                                     days
+
                                                 </p>
 
+
                                                 <p>
-                                                    <strong>Status:</strong>
+
+                                                    <strong>
+                                                        Status:
+                                                    </strong>
+
                                                     {{ selectedTrek.status }}
+
                                                 </p>
 
+
                                                 <p>
-                                                    <strong>Slots:</strong>
+
+                                                    <strong>
+                                                        Slots:
+                                                    </strong>
+
                                                     {{ selectedTrek.available_slots }}
+
                                                     /
+
                                                     {{ selectedTrek.total_slots }}
+
                                                 </p>
 
                                             </div>
@@ -4100,18 +5667,39 @@ createApp({
                                             <div class="col-md-6">
 
                                                 <p>
-                                                    <strong>Start Date:</strong>
+
+                                                    <strong>
+                                                        Start Date:
+                                                    </strong>
+
                                                     {{ selectedTrek.start_date || '-' }}
+
                                                 </p>
 
+
                                                 <p>
-                                                    <strong>End Date:</strong>
+
+                                                    <strong>
+                                                        End Date:
+                                                    </strong>
+
                                                     {{ selectedTrek.end_date || '-' }}
+
                                                 </p>
 
+
                                                 <p>
-                                                    <strong>Assigned Staff:</strong>
-                                                    {{ selectedTrek.assigned_staff || 'Not Assigned' }}
+
+                                                    <strong>
+                                                        Staff:
+                                                    </strong>
+
+                                                    {{
+                                                        selectedTrek.assigned_staff
+                                                        ||
+                                                        'Not Assigned'
+                                                    }}
+
                                                 </p>
 
                                             </div>
@@ -4123,22 +5711,40 @@ createApp({
                                             Description
                                         </h5>
 
+
                                         <p>
-                                            {{ selectedTrek.description || 'No description provided.' }}
+
+                                            {{
+                                                selectedTrek.description
+                                                ||
+                                                'No description provided.'
+                                            }}
+
                                         </p>
 
 
                                         <button
-                                            v-if="selectedTrek.status==='Open'"
+                                            v-if="
+                                                selectedTrek.status ===
+                                                'Open'
+                                            "
                                             class="btn btn-success"
-                                            :disabled="selectedTrek.available_slots <= 0"
-                                            @click="bookTrek(selectedTrek)"
+                                            :disabled="
+                                                selectedTrek.available_slots <= 0
+                                            "
+                                            @click="
+                                                bookTrek(
+                                                    selectedTrek
+                                                )
+                                            "
                                         >
+
                                             {{
                                                 selectedTrek.available_slots > 0
                                                 ? 'Book This Trek'
                                                 : 'Trek Full'
                                             }}
+
                                         </button>
 
                                     </div>
@@ -4152,19 +5758,23 @@ createApp({
 
 
                         <!-- ============================================= -->
-                        <!-- MY BOOKINGS -->
+                        <!-- TREKKER BOOKINGS -->
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="currentPage==='trekker-bookings'"
+                            v-else-if="
+                                currentPage ===
+                                'trekker-bookings'
+                            "
                         >
 
                             <h2 class="fw-bold">
                                 My Bookings
                             </h2>
 
+
                             <p class="text-muted">
-                                Your currently active trek bookings.
+                                Your active trek bookings.
                             </p>
 
 
@@ -4172,12 +5782,16 @@ createApp({
 
 
                                 <div
-                                    v-for="booking in trekkerBookings"
+                                    v-for="
+                                        booking in trekkerBookings
+                                    "
                                     :key="booking.id"
                                     class="col-lg-6"
                                 >
 
-                                    <div class="card dashboard-card">
+                                    <div
+                                        class="card dashboard-card"
+                                    >
 
                                         <div class="card-body">
 
@@ -4192,52 +5806,78 @@ createApp({
 
 
                                             <p>
-                                                <strong>Booking ID:</strong>
+
+                                                <strong>
+                                                    Booking ID:
+                                                </strong>
+
                                                 #{{ booking.id }}
+
                                             </p>
 
 
                                             <p>
-                                                <strong>Booking Status:</strong>
 
-                                                <span class="badge bg-success">
+                                                <strong>
+                                                    Booking Status:
+                                                </strong>
+
+                                                <span
+                                                    class="badge bg-success"
+                                                >
                                                     {{ booking.booking_status }}
                                                 </span>
+
                                             </p>
 
 
                                             <p>
-                                                <strong>Trek Status:</strong>
+
+                                                <strong>
+                                                    Trek Status:
+                                                </strong>
+
                                                 {{ booking.trek_status }}
+
                                             </p>
 
 
                                             <p>
-                                                <strong>Difficulty:</strong>
-                                                {{ booking.difficulty }}
-                                            </p>
 
+                                                <strong>
+                                                    Start:
+                                                </strong>
 
-                                            <p>
-                                                <strong>Start:</strong>
                                                 {{ booking.start_date || '-' }}
+
                                             </p>
 
 
                                             <p>
-                                                <strong>Payment:</strong>
+
+                                                <strong>
+                                                    Payment:
+                                                </strong>
+
                                                 {{ booking.payment_status }}
+
                                             </p>
 
 
                                             <button
                                                 v-if="
-                                                    booking.trek_status !== 'Ongoing'
+                                                    booking.trek_status !==
+                                                    'Ongoing'
                                                     &&
-                                                    booking.trek_status !== 'Completed'
+                                                    booking.trek_status !==
+                                                    'Completed'
                                                 "
                                                 class="btn btn-danger"
-                                                @click="cancelBooking(booking)"
+                                                @click="
+                                                    cancelBooking(
+                                                        booking
+                                                    )
+                                                "
                                             >
                                                 Cancel Booking
                                             </button>
@@ -4258,14 +5898,16 @@ createApp({
 
 
                                 <div
-                                    v-if="trekkerBookings.length===0"
+                                    v-if="
+                                        trekkerBookings.length === 0
+                                    "
                                     class="col-12"
                                 >
 
-                                    <div class="alert alert-info">
-
-                                        You currently have no active bookings.
-
+                                    <div
+                                        class="alert alert-info"
+                                    >
+                                        No active bookings.
                                     </div>
 
                                 </div>
@@ -4281,7 +5923,10 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="currentPage==='trekker-history'"
+                            v-else-if="
+                                currentPage ===
+                                'trekker-history'
+                            "
                         >
 
                             <h2 class="fw-bold">
@@ -4289,11 +5934,96 @@ createApp({
                             </h2>
 
 
+                            <p class="text-muted">
+                                Complete booking history and CSV export.
+                            </p>
+
+
+                            <!-- CSV EXPORT -->
+
+                            <div class="mb-4">
+
+
+                                <button
+                                    class="btn btn-success me-2"
+                                    @click="
+                                        startHistoryExport
+                                    "
+                                    :disabled="
+                                        exportJob &&
+                                        (
+                                            exportJob.status ===
+                                            'Pending'
+                                            ||
+                                            exportJob.status ===
+                                            'Processing'
+                                        )
+                                    "
+                                >
+
+                                    <span
+                                        v-if="
+                                            exportJob &&
+                                            (
+                                                exportJob.status ===
+                                                'Pending'
+                                                ||
+                                                exportJob.status ===
+                                                'Processing'
+                                            )
+                                        "
+                                    >
+                                        Export Processing...
+                                    </span>
+
+
+                                    <span v-else>
+                                        Export History CSV
+                                    </span>
+
+                                </button>
+
+
+                                <button
+                                    v-if="
+                                        exportJob &&
+                                        exportJob.status ===
+                                        'Completed'
+                                    "
+                                    class="btn btn-primary"
+                                    @click="
+                                        downloadHistoryExport
+                                    "
+                                >
+                                    Download CSV
+                                </button>
+
+
+                                <span
+                                    v-if="
+                                        exportJob
+                                    "
+                                    class="ms-3"
+                                >
+
+                                    Status:
+
+                                    <strong>
+                                        {{ exportJob.status }}
+                                    </strong>
+
+                                </span>
+
+                            </div>
+
+
                             <div
-                                class="table-responsive table-container mt-4"
+                                class="table-responsive table-container"
                             >
 
-                                <table class="table table-hover">
+                                <table
+                                    class="table table-hover"
+                                >
 
                                     <thead>
 
@@ -4313,7 +6043,9 @@ createApp({
                                     <tbody>
 
                                         <tr
-                                            v-for="item in trekkerHistory"
+                                            v-for="
+                                                item in trekkerHistory
+                                            "
                                             :key="item.id"
                                         >
 
@@ -4321,17 +6053,21 @@ createApp({
                                                 #{{ item.id }}
                                             </td>
 
+
                                             <td>
                                                 {{ item.trek_name }}
                                             </td>
+
 
                                             <td>
                                                 {{ item.location }}
                                             </td>
 
+
                                             <td>
                                                 {{ item.booking_date }}
                                             </td>
+
 
                                             <td>
 
@@ -4339,13 +6075,16 @@ createApp({
                                                     class="badge"
                                                     :class="{
                                                         'bg-success':
-                                                            item.booking_status==='Booked',
+                                                            item.booking_status ===
+                                                            'Booked',
 
                                                         'bg-danger':
-                                                            item.booking_status==='Cancelled',
+                                                            item.booking_status ===
+                                                            'Cancelled',
 
                                                         'bg-primary':
-                                                            item.booking_status==='Completed'
+                                                            item.booking_status ===
+                                                            'Completed'
                                                     }"
                                                 >
                                                     {{ item.booking_status }}
@@ -4353,9 +6092,11 @@ createApp({
 
                                             </td>
 
+
                                             <td>
                                                 {{ item.trek_status }}
                                             </td>
+
 
                                             <td>
                                                 {{ item.payment_status }}
@@ -4365,7 +6106,9 @@ createApp({
 
 
                                         <tr
-                                            v-if="trekkerHistory.length===0"
+                                            v-if="
+                                                trekkerHistory.length === 0
+                                            "
                                         >
 
                                             <td
@@ -4392,7 +6135,10 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="currentPage==='trekker-profile'"
+                            v-else-if="
+                                currentPage ===
+                                'trekker-profile'
+                            "
                         >
 
                             <h2 class="fw-bold">
@@ -4401,7 +6147,9 @@ createApp({
 
 
                             <div
-                                v-if="trekkerProfile"
+                                v-if="
+                                    trekkerProfile
+                                "
                                 class="card dashboard-card mt-4"
                             >
 
@@ -4417,7 +6165,9 @@ createApp({
                                             </label>
 
                                             <input
-                                                v-model="trekkerProfileForm.name"
+                                                v-model="
+                                                    trekkerProfileForm.name
+                                                "
                                                 class="form-control"
                                             >
 
@@ -4431,7 +6181,9 @@ createApp({
                                             </label>
 
                                             <input
-                                                v-model="trekkerProfileForm.phone"
+                                                v-model="
+                                                    trekkerProfileForm.phone
+                                                "
                                                 class="form-control"
                                             >
 
@@ -4445,7 +6197,9 @@ createApp({
                                             </label>
 
                                             <input
-                                                :value="trekkerProfile.email"
+                                                :value="
+                                                    trekkerProfile.email
+                                                "
                                                 class="form-control"
                                                 disabled
                                             >
@@ -4460,7 +6214,9 @@ createApp({
                                             </label>
 
                                             <input
-                                                :value="trekkerProfile.role"
+                                                :value="
+                                                    trekkerProfile.role
+                                                "
                                                 class="form-control"
                                                 disabled
                                             >
@@ -4472,7 +6228,9 @@ createApp({
 
                                             <button
                                                 class="btn btn-primary"
-                                                @click="updateTrekkerProfile"
+                                                @click="
+                                                    updateTrekkerProfile
+                                                "
                                             >
                                                 Save Profile
                                             </button>
@@ -4483,6 +6241,125 @@ createApp({
 
                                 </div>
 
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- ============================================= -->
+                        <!-- TREKKER NOTIFICATIONS -->
+                        <!-- ============================================= -->
+
+                        <div
+                            v-else-if="
+                                currentPage ===
+                                'trekker-notifications'
+                            "
+                        >
+
+                            <h2 class="fw-bold">
+                                Notifications
+                            </h2>
+
+
+                            <p class="text-muted">
+                                Trek reminders and background job updates.
+                            </p>
+
+
+                            <div
+                                v-for="
+                                    notification
+                                    in notifications
+                                "
+                                :key="
+                                    notification.id
+                                "
+                                class="card dashboard-card mb-3"
+                                :class="{
+                                    'border-primary':
+                                        !notification.is_read
+                                }"
+                            >
+
+                                <div class="card-body">
+
+
+                                    <div
+                                        class="d-flex justify-content-between align-items-start"
+                                    >
+
+                                        <h5>
+                                            {{ notification.title }}
+                                        </h5>
+
+
+                                        <span
+                                            class="badge bg-secondary"
+                                        >
+                                            {{ notification.notification_type }}
+                                        </span>
+
+                                    </div>
+
+
+                                    <p class="mb-2">
+                                        {{ notification.message }}
+                                    </p>
+
+
+                                    <small class="text-muted">
+                                        {{ notification.created_at }}
+                                    </small>
+
+
+                                    <div
+                                        v-if="
+                                            !notification.is_read
+                                        "
+                                        class="mt-3"
+                                    >
+
+                                        <button
+                                            class="btn btn-sm btn-outline-primary"
+                                            @click="
+                                                markNotificationRead(
+                                                    notification
+                                                )
+                                            "
+                                        >
+                                            Mark as Read
+                                        </button>
+
+                                    </div>
+
+
+                                    <div
+                                        v-else
+                                        class="mt-3"
+                                    >
+
+                                        <span
+                                            class="badge bg-success"
+                                        >
+                                            Read
+                                        </span>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+
+                            <div
+                                v-if="
+                                    notifications.length === 0
+                                "
+                                class="alert alert-info"
+                            >
+                                No notifications yet.
                             </div>
 
                         </div>

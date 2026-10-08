@@ -8,6 +8,7 @@ from api import api_bp
 from db import init_db
 from staff_api import staff_bp
 from trekker_api import trekker_bp
+from job_api import job_bp
 
 def create_app():
 
@@ -44,6 +45,7 @@ def create_app():
     app.register_blueprint(admin_bp)
     app.register_blueprint(staff_bp)
     app.register_blueprint(trekker_bp)
+    app.register_blueprint(job_bp)
 
     # -----------------------------------------------------
     # FRONTEND ENTRY POINT
