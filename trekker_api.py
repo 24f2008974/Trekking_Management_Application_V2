@@ -1,3 +1,5 @@
+import hashlib
+
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import (
     get_jwt_identity,
@@ -5,6 +7,13 @@ from flask_jwt_extended import (
 )
 
 from auth import role_required
+
+from cache import (
+    get_json_cache,
+    invalidate_trek_cache,
+    set_json_cache
+)
+
 from db import get_db_connection
 
 
@@ -30,50 +39,71 @@ def trekker_dashboard():
 
     connection = get_db_connection()
 
+
     available_treks = connection.execute(
         """
         SELECT COUNT(*) AS count
+
         FROM treks
+
         WHERE status = 'Open'
+
         AND available_slots > 0
         """
     ).fetchone()["count"]
 
+
     active_bookings = connection.execute(
         """
         SELECT COUNT(*) AS count
+
         FROM bookings
+
         WHERE user_id = ?
+
         AND status = 'Booked'
         """,
         (user_id,)
     ).fetchone()["count"]
 
+
     completed_treks = connection.execute(
         """
         SELECT COUNT(*) AS count
+
         FROM bookings
+
         WHERE user_id = ?
+
         AND status = 'Completed'
         """,
         (user_id,)
     ).fetchone()["count"]
 
+
     cancelled_bookings = connection.execute(
         """
         SELECT COUNT(*) AS count
+
         FROM bookings
+
         WHERE user_id = ?
+
         AND status = 'Cancelled'
         """,
         (user_id,)
     ).fetchone()["count"]
 
+
     connection.close()
 
+
     return jsonify({
+
         "success": True,
+
         "stats": {
+
             "available_treks":
                 available_treks,
 
@@ -90,7 +120,8 @@ def trekker_dashboard():
 
 
 # =========================================================
-# VIEW OPEN TREKS + SEARCH / FILTER
+# VIEW OPEN TREKS
+# SEARCH + FILTER + REDIS CACHE
 # =========================================================
 
 @trekker_bp.get("/treks")
@@ -118,6 +149,55 @@ def get_available_treks():
         ""
     ).strip()
 
+
+    # -----------------------------------------------------
+    # CREATE UNIQUE CACHE KEY
+    # -----------------------------------------------------
+
+    query_string = (
+        request.query_string.decode(
+            "utf-8"
+        )
+    )
+
+
+    query_hash = hashlib.sha256(
+        query_string.encode(
+            "utf-8"
+        )
+    ).hexdigest()
+
+
+    cache_key = (
+        "trekker:treks:list:"
+        f"{query_hash}"
+    )
+
+
+    # -----------------------------------------------------
+    # TRY REDIS FIRST
+    # -----------------------------------------------------
+
+    cached_data = get_json_cache(
+        cache_key
+    )
+
+
+    if cached_data is not None:
+
+        cached_data[
+            "cache"
+        ] = "HIT"
+
+        return jsonify(
+            cached_data
+        )
+
+
+    # -----------------------------------------------------
+    # DATABASE QUERY
+    # -----------------------------------------------------
+
     query = """
         SELECT
             t.id,
@@ -144,6 +224,7 @@ def get_available_treks():
                     ON u.id = sa.staff_id
 
                 WHERE sa.trek_id = t.id
+
             ) AS assigned_staff
 
         FROM treks t
@@ -151,7 +232,13 @@ def get_available_treks():
         WHERE t.status = 'Open'
     """
 
+
     parameters = []
+
+
+    # -----------------------------------------------------
+    # SEARCH
+    # -----------------------------------------------------
 
     if search:
 
@@ -163,13 +250,21 @@ def get_available_treks():
             )
         """
 
-        like_search = f"%{search}%"
+        like_search = (
+            f"%{search}%"
+        )
+
 
         parameters.extend([
             like_search,
             like_search,
             like_search
         ])
+
+
+    # -----------------------------------------------------
+    # DIFFICULTY FILTER
+    # -----------------------------------------------------
 
     if difficulty:
 
@@ -181,6 +276,11 @@ def get_available_treks():
             difficulty
         )
 
+
+    # -----------------------------------------------------
+    # LOCATION FILTER
+    # -----------------------------------------------------
+
     if location:
 
         query += """
@@ -190,6 +290,11 @@ def get_available_treks():
         parameters.append(
             f"%{location}%"
         )
+
+
+    # -----------------------------------------------------
+    # DURATION FILTER
+    # -----------------------------------------------------
 
     if duration:
 
@@ -203,17 +308,21 @@ def get_available_treks():
 
             return jsonify({
                 "success": False,
+
                 "message":
                     "Duration must be a number"
             }), 400
+
 
         query += """
             AND t.duration <= ?
         """
 
+
         parameters.append(
             duration_value
         )
+
 
     query += """
         ORDER BY
@@ -221,35 +330,90 @@ def get_available_treks():
             t.id DESC
     """
 
+
     connection = get_db_connection()
+
 
     treks = connection.execute(
         query,
         parameters
     ).fetchall()
 
+
     connection.close()
 
-    return jsonify({
+
+    result = {
+
         "success": True,
 
         "treks": [
             dict(trek)
             for trek in treks
-        ]
-    })
+        ],
+
+        "cache": "MISS"
+    }
+
+
+    # -----------------------------------------------------
+    # SAVE IN REDIS FOR 2 MINUTES
+    # -----------------------------------------------------
+
+    set_json_cache(
+        cache_key,
+        result,
+        ttl=120
+    )
+
+
+    return jsonify(
+        result
+    )
 
 
 # =========================================================
-# VIEW ONE OPEN TREK
+# VIEW ONE TREK WITH REDIS CACHE
 # =========================================================
 
-@trekker_bp.get("/treks/<int:trek_id>")
+@trekker_bp.get(
+    "/treks/<int:trek_id>"
+)
 @jwt_required()
 @role_required("Trekker")
 def get_trek_details(trek_id):
 
+    cache_key = (
+        f"trekker:treks:detail:{trek_id}"
+    )
+
+
+    # -----------------------------------------------------
+    # REDIS
+    # -----------------------------------------------------
+
+    cached_data = get_json_cache(
+        cache_key
+    )
+
+
+    if cached_data is not None:
+
+        cached_data[
+            "cache"
+        ] = "HIT"
+
+        return jsonify(
+            cached_data
+        )
+
+
+    # -----------------------------------------------------
+    # SQLITE
+    # -----------------------------------------------------
+
     connection = get_db_connection()
+
 
     trek = connection.execute(
         """
@@ -268,6 +432,7 @@ def get_trek_details(trek_id):
                     ON u.id = sa.staff_id
 
                 WHERE sa.trek_id = t.id
+
             ) AS assigned_staff
 
         FROM treks t
@@ -277,20 +442,42 @@ def get_trek_details(trek_id):
         (trek_id,)
     ).fetchone()
 
+
     connection.close()
+
 
     if trek is None:
 
         return jsonify({
             "success": False,
+
             "message":
                 "Trek not found"
         }), 404
 
-    return jsonify({
+
+    result = {
+
         "success": True,
-        "trek": dict(trek)
-    })
+
+        "trek":
+            dict(trek),
+
+        "cache":
+            "MISS"
+    }
+
+
+    set_json_cache(
+        cache_key,
+        result,
+        ttl=120
+    )
+
+
+    return jsonify(
+        result
+    )
 
 
 # =========================================================
@@ -308,16 +495,24 @@ def book_trek(trek_id):
         get_jwt_identity()
     )
 
+
     connection = get_db_connection()
+
 
     try:
 
-        # BEGIN IMMEDIATE obtains write lock early.
-        # This helps avoid two users taking the
-        # final available slot at the same time.
+        # -------------------------------------------------
+        # WRITE LOCK
+        # -------------------------------------------------
+
         connection.execute(
             "BEGIN IMMEDIATE"
         )
+
+
+        # -------------------------------------------------
+        # USER VALIDATION
+        # -------------------------------------------------
 
         user = connection.execute(
             """
@@ -334,6 +529,7 @@ def book_trek(trek_id):
             (user_id,)
         ).fetchone()
 
+
         if user is None:
 
             connection.rollback()
@@ -345,6 +541,7 @@ def book_trek(trek_id):
                     "User not found"
             }), 404
 
+
         if user["role"] != "Trekker":
 
             connection.rollback()
@@ -352,9 +549,11 @@ def book_trek(trek_id):
 
             return jsonify({
                 "success": False,
+
                 "message":
                     "Only Trekkers can book treks"
             }), 403
+
 
         if not user["is_active"]:
 
@@ -363,9 +562,11 @@ def book_trek(trek_id):
 
             return jsonify({
                 "success": False,
+
                 "message":
                     "Your account is inactive"
             }), 403
+
 
         if user["is_blacklisted"]:
 
@@ -374,9 +575,15 @@ def book_trek(trek_id):
 
             return jsonify({
                 "success": False,
+
                 "message":
                     "Your account is blacklisted"
             }), 403
+
+
+        # -------------------------------------------------
+        # TREK
+        # -------------------------------------------------
 
         trek = connection.execute(
             """
@@ -386,6 +593,7 @@ def book_trek(trek_id):
             """,
             (trek_id,)
         ).fetchone()
+
 
         if trek is None:
 
@@ -398,6 +606,7 @@ def book_trek(trek_id):
                     "Trek not found"
             }), 404
 
+
         if trek["status"] != "Open":
 
             connection.rollback()
@@ -405,35 +614,51 @@ def book_trek(trek_id):
 
             return jsonify({
                 "success": False,
+
                 "message":
                     "Only Open treks can be booked"
             }), 400
 
-        if trek["available_slots"] <= 0:
+
+        if (
+            trek["available_slots"] <= 0
+        ):
 
             connection.rollback()
             connection.close()
 
             return jsonify({
                 "success": False,
+
                 "message":
                     "No slots are available for this trek"
             }), 409
 
-        existing_booking = connection.execute(
-            """
-            SELECT id
-            FROM bookings
 
-            WHERE user_id = ?
-            AND trek_id = ?
-            AND status = 'Booked'
-            """,
-            (
-                user_id,
-                trek_id
-            )
-        ).fetchone()
+        # -------------------------------------------------
+        # DUPLICATE ACTIVE BOOKING
+        # -------------------------------------------------
+
+        existing_booking = (
+            connection.execute(
+                """
+                SELECT id
+
+                FROM bookings
+
+                WHERE user_id = ?
+
+                AND trek_id = ?
+
+                AND status = 'Booked'
+                """,
+                (
+                    user_id,
+                    trek_id
+                )
+            ).fetchone()
+        )
+
 
         if existing_booking:
 
@@ -442,9 +667,15 @@ def book_trek(trek_id):
 
             return jsonify({
                 "success": False,
+
                 "message":
                     "You have already booked this trek"
             }), 409
+
+
+        # -------------------------------------------------
+        # CREATE BOOKING
+        # -------------------------------------------------
 
         cursor = connection.execute(
             """
@@ -455,7 +686,13 @@ def book_trek(trek_id):
                 status,
                 payment_status
             )
-            VALUES (?, ?, 'Booked', 'Pending')
+
+            VALUES (
+                ?,
+                ?,
+                'Booked',
+                'Pending'
+            )
             """,
             (
                 user_id,
@@ -463,7 +700,12 @@ def book_trek(trek_id):
             )
         )
 
-        connection.execute(
+
+        # -------------------------------------------------
+        # DECREASE SLOT
+        # -------------------------------------------------
+
+        result = connection.execute(
             """
             UPDATE treks
 
@@ -471,20 +713,46 @@ def book_trek(trek_id):
                 available_slots - 1
 
             WHERE id = ?
+
             AND available_slots > 0
             """,
             (trek_id,)
         )
 
+
+        if result.rowcount != 1:
+
+            connection.rollback()
+            connection.close()
+
+            return jsonify({
+                "success": False,
+
+                "message":
+                    "No slots are available for this trek"
+            }), 409
+
+
         connection.commit()
+
 
         booking_id = (
             cursor.lastrowid
         )
 
+
         connection.close()
 
+
+        # -------------------------------------------------
+        # INVALIDATE CACHE
+        # -------------------------------------------------
+
+        invalidate_trek_cache()
+
+
         return jsonify({
+
             "success": True,
 
             "message":
@@ -492,17 +760,24 @@ def book_trek(trek_id):
 
             "booking_id":
                 booking_id
+
         }), 201
+
 
     except Exception as error:
 
         connection.rollback()
+
         connection.close()
 
+
         return jsonify({
+
             "success": False,
+
             "message":
                 f"Booking failed: {str(error)}"
+
         }), 500
 
 
@@ -519,7 +794,9 @@ def my_bookings():
         get_jwt_identity()
     )
 
+
     connection = get_db_connection()
+
 
     bookings = connection.execute(
         """
@@ -546,6 +823,7 @@ def my_bookings():
             ON t.id = b.trek_id
 
         WHERE b.user_id = ?
+
         AND b.status = 'Booked'
 
         ORDER BY
@@ -555,9 +833,12 @@ def my_bookings():
         (user_id,)
     ).fetchall()
 
+
     connection.close()
 
+
     return jsonify({
+
         "success": True,
 
         "bookings": [
@@ -582,7 +863,9 @@ def cancel_booking(booking_id):
         get_jwt_identity()
     )
 
+
     connection = get_db_connection()
+
 
     try:
 
@@ -590,10 +873,12 @@ def cancel_booking(booking_id):
             "BEGIN IMMEDIATE"
         )
 
+
         booking = connection.execute(
             """
             SELECT
                 b.*,
+
                 t.status AS trek_status
 
             FROM bookings b
@@ -602,6 +887,7 @@ def cancel_booking(booking_id):
                 ON t.id = b.trek_id
 
             WHERE b.id = ?
+
             AND b.user_id = ?
             """,
             (
@@ -610,6 +896,7 @@ def cancel_booking(booking_id):
             )
         ).fetchone()
 
+
         if booking is None:
 
             connection.rollback()
@@ -617,9 +904,11 @@ def cancel_booking(booking_id):
 
             return jsonify({
                 "success": False,
+
                 "message":
                     "Booking not found"
             }), 404
+
 
         if (
             booking["status"]
@@ -631,9 +920,11 @@ def cancel_booking(booking_id):
 
             return jsonify({
                 "success": False,
+
                 "message":
                     "Only active bookings can be cancelled"
             }), 400
+
 
         if (
             booking["trek_status"]
@@ -653,6 +944,7 @@ def cancel_booking(booking_id):
                     "Ongoing or completed trek booking cannot be cancelled"
             }), 400
 
+
         connection.execute(
             """
             UPDATE bookings
@@ -664,15 +956,25 @@ def cancel_booking(booking_id):
             (booking_id,)
         )
 
+
         connection.execute(
             """
             UPDATE treks
 
             SET available_slots =
                 CASE
-                    WHEN available_slots < total_slots
-                    THEN available_slots + 1
-                    ELSE total_slots
+
+                    WHEN
+                        available_slots
+                        <
+                        total_slots
+
+                    THEN
+                        available_slots + 1
+
+                    ELSE
+                        total_slots
+
                 END
 
             WHERE id = ?
@@ -682,31 +984,43 @@ def cancel_booking(booking_id):
             )
         )
 
+
         connection.commit()
+
         connection.close()
 
+
+        invalidate_trek_cache()
+
+
         return jsonify({
+
             "success": True,
 
             "message":
                 "Booking cancelled successfully"
         })
 
+
     except Exception as error:
 
         connection.rollback()
+
         connection.close()
 
+
         return jsonify({
+
             "success": False,
 
             "message":
                 f"Cancellation failed: {str(error)}"
+
         }), 500
 
 
 # =========================================================
-# COMPLETE BOOKING HISTORY
+# COMPLETE HISTORY
 # =========================================================
 
 @trekker_bp.get("/history")
@@ -718,7 +1032,9 @@ def trekking_history():
         get_jwt_identity()
     )
 
+
     connection = get_db_connection()
+
 
     history = connection.execute(
         """
@@ -751,9 +1067,12 @@ def trekking_history():
         (user_id,)
     ).fetchall()
 
+
     connection.close()
 
+
     return jsonify({
+
         "success": True,
 
         "history": [
@@ -764,7 +1083,7 @@ def trekking_history():
 
 
 # =========================================================
-# PROFILE
+# GET PROFILE
 # =========================================================
 
 @trekker_bp.get("/profile")
@@ -776,7 +1095,9 @@ def get_profile():
         get_jwt_identity()
     )
 
+
     connection = get_db_connection()
+
 
     user = connection.execute(
         """
@@ -793,24 +1114,32 @@ def get_profile():
         FROM users
 
         WHERE id = ?
+
         AND role = 'Trekker'
         """,
         (user_id,)
     ).fetchone()
 
+
     connection.close()
+
 
     if user is None:
 
         return jsonify({
             "success": False,
+
             "message":
                 "Trekker profile not found"
         }), 404
 
+
     return jsonify({
+
         "success": True,
-        "profile": dict(user)
+
+        "profile":
+            dict(user)
     })
 
 
@@ -827,29 +1156,38 @@ def update_profile():
         get_jwt_identity()
     )
 
+
     data = request.get_json(
         silent=True
     )
+
 
     if not data:
 
         return jsonify({
             "success": False,
+
             "message":
                 "Request body is required"
         }), 400
 
+
     connection = get_db_connection()
+
 
     user = connection.execute(
         """
         SELECT *
+
         FROM users
+
         WHERE id = ?
+
         AND role = 'Trekker'
         """,
         (user_id,)
     ).fetchone()
+
 
     if user is None:
 
@@ -857,9 +1195,11 @@ def update_profile():
 
         return jsonify({
             "success": False,
+
             "message":
                 "User not found"
         }), 404
+
 
     name = str(
         data.get(
@@ -868,6 +1208,7 @@ def update_profile():
         )
     ).strip()
 
+
     phone = str(
         data.get(
             "phone",
@@ -875,15 +1216,18 @@ def update_profile():
         )
     ).strip()
 
+
     if not name:
 
         connection.close()
 
         return jsonify({
             "success": False,
+
             "message":
                 "Name is required"
         }), 400
+
 
     connection.execute(
         """
@@ -902,7 +1246,9 @@ def update_profile():
         )
     )
 
+
     connection.commit()
+
 
     updated_user = connection.execute(
         """
@@ -923,9 +1269,12 @@ def update_profile():
         (user_id,)
     ).fetchone()
 
+
     connection.close()
 
+
     return jsonify({
+
         "success": True,
 
         "message":

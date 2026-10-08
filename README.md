@@ -76,6 +76,7 @@ Trekking_Management_Application_V2/
 | UI/UX & PWA | Not Started |
 | Reports & Analytics | Not Started |
 | Milestone 6 - Booking History & Trek Status Tracking | Completed |
+| Milestone 8 - Redis API Caching | Completed |
 
 ## Issues and Resolutions
 
