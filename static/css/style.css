@@ -9,15 +9,7 @@ body {
     font-family: Arial, Helvetica, sans-serif;
 }
 
-#app {
-    min-height: 100vh;
-}
-
-
-/* =========================================================
-   Application Layout
-   ========================================================= */
-
+#app,
 .app-container {
     min-height: 100vh;
 }
@@ -42,77 +34,60 @@ body {
 }
 
 .sidebar .nav-link {
-    color: #ced4da;
+    width: 100%;
+    margin-bottom: 5px;
+    padding: 10px 12px;
+    border: 0;
     border-radius: 6px;
-    margin-bottom: 4px;
+    background: transparent;
+    color: #ced4da;
 }
 
-.sidebar .nav-link:hover {
+.sidebar .nav-link:hover:not(:disabled) {
     background-color: #343a40;
-    color: white;
+    color: #fff;
 }
 
 .sidebar .nav-link.active {
     background-color: #0d6efd;
-    color: white;
+    color: #fff;
+}
+
+.sidebar .nav-link:disabled {
+    color: #6c757d;
+    cursor: not-allowed;
 }
 
 
 /* =========================================================
-   Main Content
+   Main content
    ========================================================= */
 
 .main-content {
     min-height: calc(100vh - 64px);
     padding: 24px;
+    background-color: #f5f7fa;
 }
 
 
 /* =========================================================
-   Dashboard Cards
+   Cards
    ========================================================= */
 
-.dashboard-card {
+.dashboard-card,
+.trek-card {
     border: none;
     border-radius: 12px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
 }
 
-.dashboard-card .card-body {
+.dashboard-card .card-body,
+.trek-card .card-body {
     padding: 24px;
 }
 
-
-/* =========================================================
-   Authentication
-   ========================================================= */
-
-.auth-container {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-}
-
-.auth-card {
-    width: 100%;
-    max-width: 450px;
-    border: none;
-    border-radius: 14px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-}
-
-
-/* =========================================================
-   Trek Cards
-   ========================================================= */
-
 .trek-card {
     height: 100%;
-    border: none;
-    border-radius: 12px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
     transition: transform 0.15s ease;
 }
 
@@ -122,45 +97,17 @@ body {
 
 
 /* =========================================================
-   Tables
-   ========================================================= */
-
-.table-container {
-    background-color: white;
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-}
-
-
-/* =========================================================
-   Mobile
-   ========================================================= */
-
-@media (max-width: 768px) {
-
-    .sidebar {
-        min-height: auto;
-    }
-
-    .main-content {
-        padding: 16px;
-    }
-}
-
-/* ---------------------------------------------------------
    Authentication
---------------------------------------------------------- */
+   ========================================================= */
 
 .auth-container {
     min-height: 100vh;
     display: flex;
-    justify-content: center;
     align-items: center;
+    justify-content: center;
     padding: 20px;
     background-color: #f5f7fa;
 }
-
 
 .auth-card {
     width: 100%;
@@ -171,102 +118,15 @@ body {
 }
 
 
-/* ---------------------------------------------------------
-   Application Layout
---------------------------------------------------------- */
-
-.app-container {
-    min-height: 100vh;
-}
-
-
-.app-navbar {
-    min-height: 64px;
-}
-
-
-.sidebar {
-    min-height: calc(100vh - 64px);
-    background-color: #212529;
-}
-
-
-.sidebar .nav-link {
-    color: #ced4da;
-    border: none;
-    background: transparent;
-    border-radius: 6px;
-    margin-bottom: 5px;
-    width: 100%;
-}
-
-
-.sidebar .nav-link:hover:not(:disabled) {
-    background-color: #343a40;
-    color: #ffffff;
-}
-
-
-.sidebar .nav-link.active {
-    background-color: #0d6efd;
-    color: #ffffff;
-}
-
-
-.sidebar .nav-link:disabled {
-    color: #6c757d;
-    cursor: not-allowed;
-}
-
-
-.main-content {
-    min-height: calc(100vh - 64px);
-    padding: 25px;
-    background-color: #f5f7fa;
-}
-
-
-/* ---------------------------------------------------------
-   Dashboard Cards
---------------------------------------------------------- */
-
-.dashboard-card {
-    border: none;
-    border-radius: 12px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
-}
-
-
-.dashboard-card .card-body {
-    padding: 24px;
-}
-
-
-/* ---------------------------------------------------------
-   Mobile
---------------------------------------------------------- */
-
-@media (max-width: 768px) {
-
-    .sidebar {
-        min-height: auto;
-    }
-
-    .main-content {
-        padding: 16px;
-    }
-
-    .app-navbar .container-fluid {
-        gap: 10px;
-    }
-}
-
-/* Admin tables */
+/* =========================================================
+   Tables
+   ========================================================= */
 
 .table-container {
-    background: white;
+    overflow-x: auto;
     padding: 20px;
     border-radius: 12px;
+    background-color: #fff;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
 }
 
@@ -275,47 +135,20 @@ body {
 }
 
 
-/* Admin forms */
-
-.card {
-    overflow: hidden;
-}
-
-.form-label {
-    font-weight: 500;
-}
-
-
-/* Sidebar buttons */
-
-.sidebar button.nav-link {
-    display: block;
-    width: 100%;
-    padding: 10px 12px;
-    margin-bottom: 5px;
-    border: none;
-    text-decoration: none;
-}
-
-
-/* Dashboard cards */
-
-.dashboard-card {
-    height: 100%;
-}
-
-
-/* Small screens */
+/* =========================================================
+   Mobile
+   ========================================================= */
 
 @media (max-width: 768px) {
-
     .sidebar {
         min-height: auto;
     }
 
-    .sidebar button.nav-link {
-        display: inline-block;
-        width: auto;
-        margin-right: 4px;
+    .main-content {
+        padding: 16px;
+    }
+
+    .app-navbar {
+        gap: 10px;
     }
 }

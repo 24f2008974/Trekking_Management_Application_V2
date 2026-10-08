@@ -132,6 +132,17 @@ createApp({
 
 
             // =================================================
+            // ADMIN REPORTS
+            // =================================================
+
+            adminReports: [],
+
+            reportMonth: new Date().toISOString().slice(0, 7),
+
+            reportTask: null,
+
+
+            // =================================================
             // STAFF DASHBOARD
             // =================================================
 
@@ -756,6 +767,15 @@ createApp({
             ) {
 
                 await this.loadBookings();
+            }
+
+
+            if (
+                page ===
+                "admin-reports"
+            ) {
+
+                await this.loadAdminReports();
             }
 
 
@@ -1464,6 +1484,225 @@ createApp({
                     staff:
                         data.staff
                 };
+
+            } catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        // =====================================================
+        // ADMIN REPORTS
+        // =====================================================
+
+        async loadAdminReports() {
+
+            this.clearMessages();
+
+            try {
+
+                const data =
+                    await this.apiRequest(
+                        "/api/jobs/admin/reports"
+                    );
+
+                this.adminReports =
+                    data.reports;
+
+            } catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        async viewAdminReport(report) {
+
+            this.clearMessages();
+
+            const reportWindow = window.open(
+                "",
+                "_blank"
+            );
+
+            try {
+
+                const response = await fetch(
+                    `/api/jobs/admin/reports/${encodeURIComponent(report.file_name)}/view`,
+                    {
+                        headers: {
+                            "Authorization":
+                                `Bearer ${this.token}`
+                        }
+                    }
+                );
+
+                if (!response.ok) {
+                    let message = "Report view failed.";
+
+                    try {
+                        const data = await response.json();
+                        message = data.message || message;
+                    } catch (error) {
+                    }
+
+                    throw new Error(message);
+                }
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+
+                if (reportWindow) {
+                    reportWindow.location.href = url;
+                } else {
+                    throw new Error(
+                        "Browser blocked the report window. Allow pop-ups for localhost and try again."
+                    );
+                }
+
+                setTimeout(
+                    () => window.URL.revokeObjectURL(url),
+                    60000
+                );
+
+            } catch (error) {
+
+                if (reportWindow) {
+                    reportWindow.close();
+                }
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        async generateAdminReport() {
+
+            this.clearMessages();
+
+            if (!this.reportMonth) {
+                this.errorMessage =
+                    "Select a report month.";
+                return;
+            }
+
+            try {
+
+                const data = await this.apiRequest(
+                    "/api/jobs/admin/reports/generate",
+                    {
+                        method: "POST",
+                        body: JSON.stringify({
+                            month: this.reportMonth
+                        })
+                    }
+                );
+
+                this.reportTask = {
+                    task_id: data.task_id,
+                    state: "PENDING"
+                };
+
+                this.successMessage =
+                    "Report generation started in the background.";
+
+                await this.pollAdminReportTask(
+                    data.task_id
+                );
+
+            } catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        async pollAdminReportTask(taskId) {
+
+            try {
+
+                const data = await this.apiRequest(
+                    `/api/jobs/admin/reports/task/${encodeURIComponent(taskId)}`
+                );
+
+                this.reportTask = data;
+
+                if (
+                    data.state === "PENDING"
+                    ||
+                    data.state === "STARTED"
+                    ||
+                    data.state === "RETRY"
+                ) {
+                    setTimeout(
+                        () => this.pollAdminReportTask(taskId),
+                        1000
+                    );
+                    return;
+                }
+
+                if (data.state === "SUCCESS") {
+                    await this.loadAdminReports();
+
+                    this.successMessage =
+                        "Monthly report generated successfully.";
+
+                    return;
+                }
+
+                if (data.state === "FAILURE") {
+                    this.errorMessage =
+                        data.error || "Report generation failed.";
+                }
+
+            } catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        async downloadAdminReport(report) {
+
+            this.clearMessages();
+
+            try {
+
+                const response = await fetch(
+                    `/api/jobs/admin/reports/${encodeURIComponent(report.file_name)}/download`,
+                    {
+                        headers: {
+                            "Authorization":
+                                `Bearer ${this.token}`
+                        }
+                    }
+                );
+
+                if (!response.ok) {
+                    let message = "Report download failed.";
+                    try {
+                        const data = await response.json();
+                        message = data.message || message;
+                    } catch (error) {
+                    }
+                    throw new Error(message);
+                }
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = report.file_name;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                window.URL.revokeObjectURL(url);
 
             } catch (error) {
 
@@ -2867,6 +3106,23 @@ createApp({
                             "
                         >
                             Bookings
+                        </button>
+
+
+                        <button
+                            class="nav-link text-start"
+                            :class="{
+                                active:
+                                currentPage ===
+                                'admin-reports'
+                            }"
+                            @click="
+                                navigate(
+                                    'admin-reports'
+                                )
+                            "
+                        >
+                            Reports
                         </button>
 
 
@@ -4401,6 +4657,143 @@ createApp({
 
 
                         <!-- ============================================= -->
+                        <!-- ADMIN REPORTS -->
+                        <!-- ============================================= -->
+
+                        <div
+                            v-else-if="
+                                currentPage ===
+                                'admin-reports'
+                            "
+                        >
+
+                            <h2 class="fw-bold">
+                                Monthly Reports
+                            </h2>
+
+                            <p class="text-muted">
+                                Celery Beat automatically generates the previous completed month on the first day of each month.
+                                For testing or regeneration, you can also select a month manually.
+                            </p>
+
+                            <div class="card dashboard-card mt-4">
+                                <div class="card-body">
+                                    <h5>Generate / Refresh Monthly Report</h5>
+
+                                    <div class="row g-3 align-items-end">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Report Month</label>
+                                            <input
+                                                v-model="reportMonth"
+                                                type="month"
+                                                class="form-control"
+                                            >
+                                        </div>
+
+                                        <div class="col-md-8">
+                                            <button
+                                                class="btn btn-success me-2"
+                                                @click="generateAdminReport"
+                                                :disabled="
+                                                    reportTask
+                                                    &&
+                                                    (
+                                                        reportTask.state === 'PENDING'
+                                                        ||
+                                                        reportTask.state === 'STARTED'
+                                                        ||
+                                                        reportTask.state === 'RETRY'
+                                                    )
+                                                "
+                                            >
+                                                {{
+                                                    reportTask
+                                                    &&
+                                                    (
+                                                        reportTask.state === 'PENDING'
+                                                        ||
+                                                        reportTask.state === 'STARTED'
+                                                        ||
+                                                        reportTask.state === 'RETRY'
+                                                    )
+                                                    ? 'Generating...'
+                                                    : 'Generate Report'
+                                                }}
+                                            </button>
+
+                                            <button
+                                                class="btn btn-outline-secondary"
+                                                @click="loadAdminReports"
+                                            >
+                                                Refresh List
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive table-container mt-4">
+
+                                <table class="table table-hover align-middle">
+
+                                    <thead>
+                                        <tr>
+                                            <th>Month</th>
+                                            <th>Report File</th>
+                                            <th>Size</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody>
+
+                                        <tr
+                                            v-for="report in adminReports"
+                                            :key="report.file_name"
+                                        >
+                                            <td>
+                                                {{ report.display_month || report.month_key }}
+                                            </td>
+                                            <td>
+                                                {{ report.file_name }}
+                                            </td>
+                                            <td>
+                                                {{ Math.max(1, Math.round(report.size_bytes / 1024)) }} KB
+                                            </td>
+                                            <td>
+                                                <button
+                                                    class="btn btn-outline-primary btn-sm me-2"
+                                                    @click="viewAdminReport(report)"
+                                                >
+                                                    View Report
+                                                </button>
+
+                                                <button
+                                                    class="btn btn-primary btn-sm"
+                                                    @click="downloadAdminReport(report)"
+                                                >
+                                                    Download HTML
+                                                </button>
+                                            </td>
+                                        </tr>
+
+                                        <tr v-if="adminReports.length === 0">
+                                            <td colspan="4" class="text-center text-muted">
+                                                No monthly report has been generated yet.
+                                            </td>
+                                        </tr>
+
+                                    </tbody>
+
+                                </table>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- ============================================= -->
                         <!-- STAFF DASHBOARD -->
                         <!-- ============================================= -->
 
@@ -4814,6 +5207,7 @@ createApp({
 
 
                                                 <button
+                                                    v-if="selectedStaffTrek.status === 'Approved' || selectedStaffTrek.status === 'Closed'"
                                                     class="btn btn-success me-1 mb-1"
                                                     @click="
                                                         updateStaffStatus(
@@ -4826,6 +5220,7 @@ createApp({
 
 
                                                 <button
+                                                    v-if="selectedStaffTrek.status === 'Approved' || selectedStaffTrek.status === 'Open'"
                                                     class="btn btn-secondary me-1 mb-1"
                                                     @click="
                                                         updateStaffStatus(
@@ -4838,6 +5233,7 @@ createApp({
 
 
                                                 <button
+                                                    v-if="selectedStaffTrek.status === 'Open'"
                                                     class="btn btn-warning me-1 mb-1"
                                                     @click="
                                                         updateStaffStatus(
@@ -4850,6 +5246,7 @@ createApp({
 
 
                                                 <button
+                                                    v-if="selectedStaffTrek.status === 'Ongoing'"
                                                     class="btn btn-primary mb-1"
                                                     @click="
                                                         updateStaffStatus(

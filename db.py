@@ -1,56 +1,62 @@
+import os
 import sqlite3
 from pathlib import Path
 
 from werkzeug.security import generate_password_hash
 
 
-# ---------------------------------------------------------
-# DATABASE PATH
-# ---------------------------------------------------------
-
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
-DATABASE_PATH = DATA_DIR / "trek.db"
 
+_default_database = DATA_DIR / "trek.db"
 
-# ---------------------------------------------------------
-# DATABASE CONNECTION
-# ---------------------------------------------------------
+DATABASE_PATH = Path(
+    os.getenv(
+        "TMA_DATABASE_PATH",
+        str(_default_database)
+    )
+).expanduser().resolve()
+
 
 def get_db_connection():
     """
-    Create and return SQLite database connection.
+    Return a SQLite connection with row access
+    and foreign-key checks enabled.
     """
 
-    DATA_DIR.mkdir(exist_ok=True)
+    DATABASE_PATH.parent.mkdir(
+        parents=True,
+        exist_ok=True
+    )
 
-    connection = sqlite3.connect(DATABASE_PATH)
+    connection = sqlite3.connect(
+        DATABASE_PATH,
+        timeout=10
+    )
 
-    # Allows rows to be accessed like:
-    # user["name"] instead of user[1]
     connection.row_factory = sqlite3.Row
 
-    # Enable foreign key support in SQLite
-    connection.execute("PRAGMA foreign_keys = ON")
+    connection.execute(
+        "PRAGMA foreign_keys = ON"
+    )
+
+    connection.execute(
+        "PRAGMA busy_timeout = 10000"
+    )
 
     return connection
 
 
-# ---------------------------------------------------------
-# DATABASE INITIALIZATION
-# ---------------------------------------------------------
-
 def init_db():
     """
-    Create all database tables programmatically.
+    Create complete application database schema
+    programmatically.
     """
 
     connection = get_db_connection()
 
     connection.executescript(
         """
-        
-
         ------------------------------------------------------------
         -- USERS
         ------------------------------------------------------------
@@ -90,7 +96,7 @@ def init_db():
 
 
         ------------------------------------------------------------
-        -- STAFF PROFILE
+        -- STAFF PROFILES
         ------------------------------------------------------------
 
         CREATE TABLE IF NOT EXISTS staff_profiles (
@@ -125,7 +131,14 @@ def init_db():
 
             location TEXT NOT NULL,
 
-            difficulty TEXT NOT NULL,
+            difficulty TEXT NOT NULL
+                CHECK (
+                    difficulty IN (
+                        'Easy',
+                        'Moderate',
+                        'Hard'
+                    )
+                ),
 
             duration INTEGER NOT NULL
                 CHECK (
@@ -134,12 +147,13 @@ def init_db():
 
             total_slots INTEGER NOT NULL
                 CHECK (
-                    total_slots >= 0
+                    total_slots > 0
                 ),
 
             available_slots INTEGER NOT NULL
                 CHECK (
                     available_slots >= 0
+                    AND available_slots <= total_slots
                 ),
 
             description TEXT,
@@ -185,7 +199,10 @@ def init_db():
                 REFERENCES treks(id)
                 ON DELETE CASCADE,
 
-            UNIQUE(staff_id, trek_id)
+            UNIQUE(
+                staff_id,
+                trek_id
+            )
         );
 
 
@@ -230,60 +247,174 @@ def init_db():
 
 
         ------------------------------------------------------------
+        -- IN-APP NOTIFICATIONS
+        ------------------------------------------------------------
+
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            user_id INTEGER NOT NULL,
+
+            title TEXT NOT NULL,
+
+            message TEXT NOT NULL,
+
+            notification_type TEXT NOT NULL DEFAULT 'General',
+
+            is_read INTEGER NOT NULL DEFAULT 0
+                CHECK (
+                    is_read IN (0, 1)
+                ),
+
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+            FOREIGN KEY (user_id)
+                REFERENCES users(id)
+                ON DELETE CASCADE
+        );
+
+
+        ------------------------------------------------------------
+        -- ASYNC EXPORT JOBS
+        ------------------------------------------------------------
+
+        CREATE TABLE IF NOT EXISTS export_jobs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            user_id INTEGER NOT NULL,
+
+            celery_task_id TEXT,
+
+            status TEXT NOT NULL DEFAULT 'Pending'
+                CHECK (
+                    status IN (
+                        'Pending',
+                        'Processing',
+                        'Completed',
+                        'Failed'
+                    )
+                ),
+
+            file_name TEXT,
+
+            error_message TEXT,
+
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+            completed_at TEXT,
+
+            FOREIGN KEY (user_id)
+                REFERENCES users(id)
+                ON DELETE CASCADE
+        );
+
+
+        ------------------------------------------------------------
         -- INDEXES
         ------------------------------------------------------------
 
         CREATE INDEX IF NOT EXISTS idx_users_email
-        ON users(email);
+            ON users(email);
+
+
+        CREATE INDEX IF NOT EXISTS idx_users_role
+            ON users(role);
 
 
         CREATE INDEX IF NOT EXISTS idx_treks_status
-        ON treks(status);
+            ON treks(status);
+
+
+        CREATE INDEX IF NOT EXISTS idx_treks_location
+            ON treks(location);
 
 
         CREATE INDEX IF NOT EXISTS idx_bookings_user
-        ON bookings(user_id);
+            ON bookings(user_id);
 
 
         CREATE INDEX IF NOT EXISTS idx_bookings_trek
-        ON bookings(trek_id);
+            ON bookings(trek_id);
+
+
+        CREATE INDEX IF NOT EXISTS idx_bookings_status
+            ON bookings(status);
+
+
+        CREATE INDEX IF NOT EXISTS idx_notifications_user
+            ON notifications(
+                user_id,
+                is_read
+            );
+
+
+        CREATE INDEX IF NOT EXISTS idx_export_jobs_user
+            ON export_jobs(
+                user_id,
+                status
+            );
 
 
         CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_booking
-        ON bookings(user_id, trek_id)
-        WHERE status = 'Booked';
+            ON bookings(
+                user_id,
+                trek_id
+            )
+            WHERE status = 'Booked';
 
         """
     )
 
-    create_default_admin(connection)
+    create_default_admin(
+        connection
+    )
 
     connection.commit()
+
     connection.close()
 
 
-# ---------------------------------------------------------
-# DEFAULT ADMIN
-# ---------------------------------------------------------
-
-def create_default_admin(connection):
+def create_default_admin(
+    connection
+):
     """
-    Create one default administrator if no Admin exists.
+    Create predefined Admin account
+    when no Admin exists.
     """
 
     existing_admin = connection.execute(
         """
         SELECT id
+
         FROM users
+
         WHERE role = 'Admin'
+
         LIMIT 1
         """
     ).fetchone()
 
+
     if existing_admin:
         return
 
-    hashed_password = generate_password_hash("admin123")
+
+    admin_email = os.getenv(
+        "TMA_ADMIN_EMAIL",
+        "admin@trekking.com"
+    ).strip().lower()
+
+
+    admin_password = os.getenv(
+        "TMA_ADMIN_PASSWORD",
+        "admin123"
+    )
+
+
+    hashed_password = generate_password_hash(
+        admin_password
+    )
+
 
     connection.execute(
         """
@@ -297,15 +428,21 @@ def create_default_admin(connection):
             is_active,
             is_blacklisted
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+
+        VALUES (
+            ?,
+            ?,
+            ?,
+            ?,
+            'Admin',
+            1,
+            0
+        )
         """,
         (
             "System Administrator",
-            "admin@trekking.com",
+            admin_email,
             hashed_password,
-            "",
-            "Admin",
-            1,
-            0
+            ""
         )
     )

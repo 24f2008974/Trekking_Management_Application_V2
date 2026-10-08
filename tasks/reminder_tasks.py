@@ -8,19 +8,22 @@ from db import get_db_connection
     name="tasks.reminder_tasks.send_daily_trek_reminders"
 )
 def send_daily_trek_reminders():
+    """
+    Create one in-app reminder per active booking
+    for treks starting tomorrow.
+    """
 
     connection = get_db_connection()
 
-    today = date.today()
-
     tomorrow = (
-        today + timedelta(days=1)
+        date.today()
+        + timedelta(days=1)
     ).isoformat()
 
 
-    # -----------------------------------------------------
-    # Find Trekker bookings for treks starting tomorrow
-    # -----------------------------------------------------
+    # =====================================================
+    # FIND BOOKINGS FOR TREKS STARTING TOMORROW
+    # =====================================================
 
     bookings = connection.execute(
         """
@@ -63,11 +66,16 @@ def send_daily_trek_reminders():
     reminder_count = 0
 
 
+    # =====================================================
+    # CREATE NOTIFICATIONS
+    # =====================================================
+
     for booking in bookings:
 
         title = (
             "Upcoming Trek Reminder"
         )
+
 
         message = (
             f"Hello {booking['user_name']}, "
@@ -78,6 +86,47 @@ def send_daily_trek_reminders():
         )
 
 
+        # -------------------------------------------------
+        # DUPLICATE REMINDER PROTECTION
+        # -------------------------------------------------
+
+        duplicate = connection.execute(
+            """
+            SELECT id
+
+            FROM notifications
+
+            WHERE user_id = ?
+
+            AND notification_type =
+                'Trek Reminder'
+
+            AND title = ?
+
+            AND message = ?
+
+            AND date(created_at) =
+                date('now')
+
+            LIMIT 1
+            """,
+            (
+                booking["user_id"],
+                title,
+                message
+            )
+        ).fetchone()
+
+
+        if duplicate:
+
+            continue
+
+
+        # -------------------------------------------------
+        # INSERT NOTIFICATION
+        # -------------------------------------------------
+
         connection.execute(
             """
             INSERT INTO notifications
@@ -87,13 +136,18 @@ def send_daily_trek_reminders():
                 message,
                 notification_type
             )
-            VALUES (?, ?, ?, ?)
+
+            VALUES (
+                ?,
+                ?,
+                ?,
+                'Trek Reminder'
+            )
             """,
             (
                 booking["user_id"],
                 title,
-                message,
-                "Trek Reminder"
+                message
             )
         )
 
@@ -102,11 +156,18 @@ def send_daily_trek_reminders():
 
 
     connection.commit()
+
     connection.close()
 
 
     return {
-        "success": True,
+
+        "success":
+            True,
+
         "reminders_created":
-            reminder_count
+            reminder_count,
+
+        "trek_date":
+            tomorrow
     }

@@ -1,47 +1,63 @@
 import json
+import os
 
 import redis
 
 
-# =========================================================
-# REDIS CACHE CONNECTION
-# =========================================================
-
-cache_client = redis.Redis(
-    host="127.0.0.1",
-    port=6379,
-    db=2,
-    decode_responses=True
+REDIS_CACHE_URL = os.getenv(
+    "REDIS_CACHE_URL",
+    "redis://127.0.0.1:6379/2"
 )
 
 
-# =========================================================
-# DEFAULT CACHE EXPIRY
-# =========================================================
+cache_client = redis.Redis.from_url(
 
-DEFAULT_CACHE_TTL = 120
+    REDIS_CACHE_URL,
+
+    decode_responses=True,
+
+    socket_connect_timeout=1,
+
+    socket_timeout=1,
+
+    health_check_interval=30,
+)
 
 
-# =========================================================
-# GET JSON FROM CACHE
-# =========================================================
+DEFAULT_CACHE_TTL = int(
+    os.getenv(
+        "CACHE_TTL_SECONDS",
+        "120"
+    )
+)
 
-def get_json_cache(key):
+
+def get_json_cache(
+    key
+):
     """
-    Return cached JSON data.
+    Return cached JSON.
 
-    If Redis is unavailable, return None so
-    the application continues using SQLite.
+    Redis failure behaves like
+    a normal cache miss.
     """
 
     try:
 
-        value = cache_client.get(key)
+        value = cache_client.get(
+            key
+        )
+
 
         if value is None:
+
             return None
 
-        return json.loads(value)
+
+        return json.loads(
+            value
+        )
+
 
     except (
         redis.RedisError,
@@ -51,17 +67,14 @@ def get_json_cache(key):
         return None
 
 
-# =========================================================
-# SAVE JSON IN CACHE
-# =========================================================
-
 def set_json_cache(
     key,
     value,
     ttl=DEFAULT_CACHE_TTL
 ):
     """
-    Save JSON serializable data in Redis.
+    Cache JSON-serializable data
+    with an expiry.
     """
 
     try:
@@ -69,10 +82,14 @@ def set_json_cache(
         cache_client.setex(
             key,
             ttl,
-            json.dumps(value)
+            json.dumps(
+                value
+            )
         )
 
+
         return True
+
 
     except (
         redis.RedisError,
@@ -82,55 +99,64 @@ def set_json_cache(
         return False
 
 
-# =========================================================
-# DELETE ONE CACHE KEY
-# =========================================================
-
-def delete_cache_key(key):
+def delete_cache_key(
+    key
+):
 
     try:
 
-        cache_client.delete(key)
-
-    except redis.RedisError:
-
-        pass
-
-
-# =========================================================
-# DELETE CACHE KEYS BY PATTERN
-# =========================================================
-
-def delete_cache_pattern(pattern):
-    """
-    Delete matching Redis cache keys.
-
-    scan_iter is preferred over KEYS because
-    it does not block Redis for large datasets.
-    """
-
-    try:
-
-        keys = list(
-            cache_client.scan_iter(
-                match=pattern
-            )
+        cache_client.delete(
+            key
         )
 
-        if keys:
-
-            cache_client.delete(
-                *keys
-            )
-
     except redis.RedisError:
 
         pass
 
 
-# =========================================================
-# INVALIDATE ALL TREK CACHE
-# =========================================================
+def delete_cache_pattern(
+    pattern
+):
+    """
+    Delete matching keys using SCAN
+    instead of Redis KEYS.
+    """
+
+    try:
+
+        batch = []
+
+
+        for key in cache_client.scan_iter(
+            match=pattern,
+            count=100
+        ):
+
+            batch.append(
+                key
+            )
+
+
+            if len(batch) >= 100:
+
+                cache_client.delete(
+                    *batch
+                )
+
+                batch.clear()
+
+
+        if batch:
+
+            cache_client.delete(
+                *batch
+            )
+
+
+    except redis.RedisError:
+
+        pass
+
 
 def invalidate_trek_cache():
 
@@ -139,17 +165,14 @@ def invalidate_trek_cache():
     )
 
 
-# =========================================================
-# CACHE HEALTH CHECK
-# =========================================================
-
 def cache_health():
 
     try:
 
-        return cache_client.ping()
+        return bool(
+            cache_client.ping()
+        )
 
     except redis.RedisError:
 
         return False
-    

@@ -1,3 +1,5 @@
+import os
+
 from datetime import timedelta
 
 from flask import (
@@ -11,41 +13,65 @@ from flask_jwt_extended import (
     JWTManager
 )
 
-from admin_api import admin_bp
-from api import api_bp
-from auth import auth_bp
+from admin_api import (
+    admin_bp
+)
+
+from api import (
+    api_bp
+)
+
+from auth import (
+    auth_bp
+)
 
 from cache import (
     cache_health,
     invalidate_trek_cache
 )
 
-from db import init_db
+from db import (
+    init_db
+)
 
-from job_api import job_bp
+from job_api import (
+    job_bp
+)
 
-from staff_api import staff_bp
+from staff_api import (
+    staff_bp
+)
 
-from trekker_api import trekker_bp
+from trekker_api import (
+    trekker_bp
+)
 
 
 def create_app():
 
-    app = Flask(__name__)
+    app = Flask(
+        __name__
+    )
 
 
     # =====================================================
-    # APPLICATION CONFIGURATION
+    # SECURITY CONFIG
     # =====================================================
 
     app.config[
         "SECRET_KEY"
-    ] = "change-this-secret-key"
+    ] = os.getenv(
+        "SECRET_KEY",
+        "tma-v2-local-secret-key-change-before-deployment-2026"
+    )
 
 
     app.config[
         "JWT_SECRET_KEY"
-    ] = "change-this-jwt-secret-key"
+    ] = os.getenv(
+        "JWT_SECRET_KEY",
+        "tma-v2-jwt-local-secret-key-change-before-deployment-2026"
+    )
 
 
     app.config[
@@ -59,7 +85,9 @@ def create_app():
     # JWT
     # =====================================================
 
-    JWTManager(app)
+    JWTManager(
+        app
+    )
 
 
     # =====================================================
@@ -114,12 +142,15 @@ def create_app():
     # HEALTH CHECK
     # =====================================================
 
-    @app.get("/api/health")
+    @app.get(
+        "/api/health"
+    )
     def health_check():
 
         return jsonify({
 
-            "success": True,
+            "success":
+                True,
 
             "message":
                 "Trekking Management Application API is running",
@@ -137,15 +168,18 @@ def create_app():
 
 
     # =====================================================
-    # AUTOMATIC CACHE INVALIDATION
+    # CACHE INVALIDATION
     # =====================================================
 
     @app.after_request
     def invalidate_cache_after_write(
         response
     ):
+        """
+        Refresh Trekker trek caches after
+        successful operations that can alter trek data.
+        """
 
-        # Only successful write operations
         if (
             request.method
             in {
@@ -164,44 +198,33 @@ def create_app():
             400
         ):
 
-            path = request.path
+            path = (
+                request.path
+            )
 
 
-            # ---------------------------------------------
-            # ADMIN CHANGES TO TREKS
-            # ---------------------------------------------
+            if (
+                path.startswith(
+                    "/api/admin/treks"
+                )
 
-            if path.startswith(
-                "/api/admin/treks"
-            ):
+                or
 
-                invalidate_trek_cache()
+                path.startswith(
+                    "/api/staff/treks"
+                )
 
+                or
 
-            # ---------------------------------------------
-            # STAFF CHANGES TO TREKS
-            # ---------------------------------------------
+                path.startswith(
+                    "/api/trekker/treks"
+                )
 
-            elif path.startswith(
-                "/api/staff/treks"
-            ):
+                or
 
-                invalidate_trek_cache()
-
-
-            # ---------------------------------------------
-            # TREKKER BOOKING AFFECTS SLOTS
-            # ---------------------------------------------
-
-            elif path.startswith(
-                "/api/trekker/treks"
-            ):
-
-                invalidate_trek_cache()
-
-
-            elif path.startswith(
-                "/api/trekker/bookings"
+                path.startswith(
+                    "/api/trekker/bookings"
+                )
             ):
 
                 invalidate_trek_cache()
@@ -219,7 +242,16 @@ app = create_app()
 if __name__ == "__main__":
 
     app.run(
-        host="127.0.0.1",
-        port=5000,
-        debug=True
+
+        host=
+            "127.0.0.1",
+
+        port=
+            5000,
+
+        debug=
+            os.getenv(
+                "FLASK_DEBUG",
+                "1"
+            ) == "1"
     )

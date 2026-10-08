@@ -1,12 +1,27 @@
+# Virtual environments
 venv/
 .venv/
 
+# Python cache
 __pycache__/
-*.pyc
+*.py[cod]
 
+# Local database (created programmatically)
 data/*.db
+!data/.gitkeep
 
+# Generated files
 exports/*
+!exports/.gitkeep
 reports/*
+!reports/.gitkeep
+celerybeat-schedule*
 
+# Environment / logs
 .env
+*.log
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.vscode/

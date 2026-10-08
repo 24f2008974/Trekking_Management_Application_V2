@@ -5,15 +5,67 @@ from datetime import datetime
 from pathlib import Path
 
 from celery_app import celery_app
+
 from db import get_db_connection
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-EXPORTS_DIR = (
-    BASE_DIR / "exports"
+BASE_DIR = (
+    Path(__file__)
+    .resolve()
+    .parent
+    .parent
 )
 
+
+EXPORTS_DIR = (
+    BASE_DIR
+    / "exports"
+)
+
+
+# =========================================================
+# CSV FORMULA INJECTION PROTECTION
+# =========================================================
+
+def _safe_csv_value(
+    value
+):
+    """
+    Prevent spreadsheet software from interpreting
+    exported text values as formulas.
+    """
+
+    if value is None:
+
+        return ""
+
+
+    text = str(
+        value
+    )
+
+
+    if text.startswith(
+        (
+            "=",
+            "+",
+            "-",
+            "@"
+        )
+    ):
+
+        return (
+            "'"
+            + text
+        )
+
+
+    return text
+
+
+# =========================================================
+# TREKKER HISTORY EXPORT
+# =========================================================
 
 @celery_app.task(
     bind=True,
@@ -26,40 +78,53 @@ def export_trekker_history(
 ):
 
     EXPORTS_DIR.mkdir(
+        parents=True,
         exist_ok=True
     )
 
-    connection = get_db_connection()
+
+    connection = (
+        get_db_connection()
+    )
 
 
     try:
 
-        # -------------------------------------------------
-        # JOB PROCESSING
-        # -------------------------------------------------
+        # =================================================
+        # SET JOB PROCESSING
+        # =================================================
 
         connection.execute(
             """
             UPDATE export_jobs
 
             SET
-                status = 'Processing',
-                celery_task_id = ?
+                status =
+                    'Processing',
+
+                celery_task_id = ?,
+
+                error_message =
+                    NULL
 
             WHERE id = ?
+
+            AND user_id = ?
             """,
             (
                 self.request.id,
-                export_job_id
+                export_job_id,
+                user_id
             )
         )
+
 
         connection.commit()
 
 
-        # -------------------------------------------------
-        # USER
-        # -------------------------------------------------
+        # =================================================
+        # VERIFY USER
+        # =================================================
 
         user = connection.execute(
             """
@@ -71,7 +136,9 @@ def export_trekker_history(
             FROM users
 
             WHERE id = ?
-            AND role = 'Trekker'
+
+            AND role =
+                'Trekker'
             """,
             (user_id,)
         ).fetchone()
@@ -84,31 +151,47 @@ def export_trekker_history(
             )
 
 
-        # -------------------------------------------------
-        # HISTORY
-        # -------------------------------------------------
+        # =================================================
+        # FETCH COMPLETE HISTORY
+        # =================================================
 
         history = connection.execute(
             """
             SELECT
                 b.id AS booking_id,
+
                 b.booking_date,
-                b.status AS booking_status,
+
+                b.status
+                    AS booking_status,
+
                 b.payment_status,
 
-                t.id AS trek_id,
-                t.name AS trek_name,
+                t.id
+                    AS trek_id,
+
+                t.name
+                    AS trek_name,
+
                 t.location,
+
                 t.difficulty,
+
                 t.duration,
+
                 t.start_date,
+
                 t.end_date,
-                t.status AS trek_status
+
+                t.status
+                    AS trek_status
 
             FROM bookings b
 
             JOIN treks t
-                ON t.id = b.trek_id
+
+                ON t.id =
+                    b.trek_id
 
             WHERE b.user_id = ?
 
@@ -120,36 +203,39 @@ def export_trekker_history(
         ).fetchall()
 
 
-        # -------------------------------------------------
+        # =================================================
         # FILE NAME
-        # -------------------------------------------------
+        # =================================================
 
-        timestamp = datetime.now().strftime(
-            "%Y%m%d_%H%M%S"
+        timestamp = (
+            datetime.now()
+            .strftime(
+                "%Y%m%d_%H%M%S"
+            )
         )
 
 
         file_name = (
             f"trek_history_user_"
-            f"{user_id}_{timestamp}.csv"
+            f"{user_id}_"
+            f"{timestamp}.csv"
         )
 
 
         file_path = (
-            EXPORTS_DIR /
-            file_name
+            EXPORTS_DIR
+            / file_name
         )
 
 
-        # -------------------------------------------------
+        # =================================================
         # WRITE CSV
-        # -------------------------------------------------
+        # =================================================
 
-        with open(
-            file_path,
+        with file_path.open(
             "w",
             newline="",
-            encoding="utf-8"
+            encoding="utf-8-sig"
         ) as csv_file:
 
             writer = csv.writer(
@@ -176,47 +262,116 @@ def export_trekker_history(
             for row in history:
 
                 writer.writerow([
-                    row["booking_id"],
-                    row["booking_date"],
-                    row["booking_status"],
-                    row["payment_status"],
-                    row["trek_id"],
-                    row["trek_name"],
-                    row["location"],
-                    row["difficulty"],
-                    row["duration"],
-                    row["start_date"],
-                    row["end_date"],
-                    row["trek_status"]
+
+                    _safe_csv_value(
+                        row[
+                            "booking_id"
+                        ]
+                    ),
+
+                    _safe_csv_value(
+                        row[
+                            "booking_date"
+                        ]
+                    ),
+
+                    _safe_csv_value(
+                        row[
+                            "booking_status"
+                        ]
+                    ),
+
+                    _safe_csv_value(
+                        row[
+                            "payment_status"
+                        ]
+                    ),
+
+                    _safe_csv_value(
+                        row[
+                            "trek_id"
+                        ]
+                    ),
+
+                    _safe_csv_value(
+                        row[
+                            "trek_name"
+                        ]
+                    ),
+
+                    _safe_csv_value(
+                        row[
+                            "location"
+                        ]
+                    ),
+
+                    _safe_csv_value(
+                        row[
+                            "difficulty"
+                        ]
+                    ),
+
+                    _safe_csv_value(
+                        row[
+                            "duration"
+                        ]
+                    ),
+
+                    _safe_csv_value(
+                        row[
+                            "start_date"
+                        ]
+                    ),
+
+                    _safe_csv_value(
+                        row[
+                            "end_date"
+                        ]
+                    ),
+
+                    _safe_csv_value(
+                        row[
+                            "trek_status"
+                        ]
+                    )
                 ])
 
 
-        # -------------------------------------------------
-        # COMPLETE JOB
-        # -------------------------------------------------
+        # =================================================
+        # JOB COMPLETED
+        # =================================================
 
         connection.execute(
             """
             UPDATE export_jobs
 
             SET
-                status = 'Completed',
+                status =
+                    'Completed',
+
                 file_name = ?,
+
+                error_message =
+                    NULL,
+
                 completed_at =
                     CURRENT_TIMESTAMP
 
             WHERE id = ?
+
+            AND user_id = ?
             """,
             (
                 file_name,
-                export_job_id
+                export_job_id,
+                user_id
             )
         )
 
 
-        # -------------------------------------------------
-        # NOTIFY USER
-        # -------------------------------------------------
+        # =================================================
+        # COMPLETION NOTIFICATION
+        # =================================================
 
         connection.execute(
             """
@@ -228,7 +383,12 @@ def export_trekker_history(
                 notification_type
             )
 
-            VALUES (?, ?, ?, ?)
+            VALUES (
+                ?,
+                ?,
+                ?,
+                'Export'
+            )
             """,
             (
                 user_id,
@@ -239,19 +399,21 @@ def export_trekker_history(
                     "Your trekking history "
                     "CSV export has been "
                     "generated successfully."
-                ),
-
-                "Export"
+                )
             )
         )
 
 
         connection.commit()
+
         connection.close()
 
 
         return {
-            "success": True,
+
+            "success":
+                True,
+
             "file_name":
                 file_name,
 
@@ -259,6 +421,10 @@ def export_trekker_history(
                 export_job_id
         }
 
+
+    # =====================================================
+    # HANDLE TASK FAILURE
+    # =====================================================
 
     except Exception as error:
 
@@ -270,21 +436,28 @@ def export_trekker_history(
             UPDATE export_jobs
 
             SET
-                status = 'Failed',
+                status =
+                    'Failed',
+
                 error_message = ?,
+
                 completed_at =
                     CURRENT_TIMESTAMP
 
             WHERE id = ?
+
+            AND user_id = ?
             """,
             (
                 str(error),
-                export_job_id
+                export_job_id,
+                user_id
             )
         )
 
 
         connection.commit()
+
         connection.close()
 
 
