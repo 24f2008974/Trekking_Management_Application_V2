@@ -6,35 +6,26 @@ createApp({
         return {
 
             // =================================================
-            // COMMON APP STATE
+            // COMMON
             // =================================================
 
             currentPage: "login",
-
             loading: false,
-
             errorMessage: "",
-
             successMessage: "",
 
             token: localStorage.getItem("access_token"),
-
             currentUser: null,
 
 
             // =================================================
-            // LOGIN
+            // AUTH
             // =================================================
 
             loginForm: {
                 email: "",
                 password: ""
             },
-
-
-            // =================================================
-            // TREKKER REGISTER
-            // =================================================
 
             registerForm: {
                 name: "",
@@ -46,7 +37,7 @@ createApp({
 
 
             // =================================================
-            // ADMIN DASHBOARD
+            // ADMIN
             // =================================================
 
             adminStats: {
@@ -57,11 +48,6 @@ createApp({
                 open_treks: 0,
                 completed_treks: 0
             },
-
-
-            // =================================================
-            // ADMIN TREKS
-            // =================================================
 
             treks: [],
 
@@ -79,11 +65,6 @@ createApp({
                 end_date: "",
                 status: "Pending"
             },
-
-
-            // =================================================
-            // ADMIN STAFF
-            // =================================================
 
             staff: [],
 
@@ -103,24 +84,8 @@ createApp({
                 staff_id: ""
             },
 
-
-            // =================================================
-            // ADMIN USERS
-            // =================================================
-
             users: [],
-
-
-            // =================================================
-            // ADMIN BOOKINGS
-            // =================================================
-
             bookings: [],
-
-
-            // =================================================
-            // ADMIN SEARCH
-            // =================================================
 
             searchQuery: "",
 
@@ -132,7 +97,7 @@ createApp({
 
 
             // =================================================
-            // STAFF DASHBOARD
+            // STAFF
             // =================================================
 
             staffStats: {
@@ -143,53 +108,62 @@ createApp({
                 total_participants: 0
             },
 
-
-            // =================================================
-            // STAFF TREKS
-            // =================================================
-
             staffTreks: [],
-
             selectedStaffTrek: null,
 
             staffSlotForm: {
                 total_slots: 1
             },
 
-            staffStatusForm: {
-                status: "Open"
+            staffParticipants: [],
+            staffProfile: null,
+
+
+            // =================================================
+            // TREKKER
+            // =================================================
+
+            trekkerStats: {
+                available_treks: 0,
+                active_bookings: 0,
+                completed_treks: 0,
+                cancelled_bookings: 0
             },
 
+            availableTreks: [],
 
-            // =================================================
-            // STAFF PARTICIPANTS
-            // =================================================
+            selectedTrek: null,
 
-            staffParticipants: [],
+            trekFilters: {
+                search: "",
+                difficulty: "",
+                location: "",
+                duration: ""
+            },
 
+            trekkerBookings: [],
+            trekkerHistory: [],
 
-            // =================================================
-            // STAFF PROFILE
-            // =================================================
+            trekkerProfile: null,
 
-            staffProfile: null
+            trekkerProfileForm: {
+                name: "",
+                phone: ""
+            }
         };
     },
 
 
     // =========================================================
-    // APPLICATION START
+    // APP START
     // =========================================================
 
     async mounted() {
 
         if (this.token) {
-
             await this.loadCurrentUser();
-
         }
         else {
-
             this.currentPage = "login";
         }
     },
@@ -198,20 +172,14 @@ createApp({
     methods: {
 
         // =====================================================
-        // CLEAR ALERT MESSAGES
+        // COMMON
         // =====================================================
 
         clearMessages() {
-
             this.errorMessage = "";
-
             this.successMessage = "";
         },
 
-
-        // =====================================================
-        // COMMON API REQUEST
-        // =====================================================
 
         async apiRequest(url, options = {}) {
 
@@ -219,23 +187,18 @@ createApp({
                 ...(options.headers || {})
             };
 
-
             if (this.token) {
-
                 headers["Authorization"] =
                     `Bearer ${this.token}`;
             }
-
 
             if (
                 options.body &&
                 !headers["Content-Type"]
             ) {
-
                 headers["Content-Type"] =
                     "application/json";
             }
-
 
             const response = await fetch(
                 url,
@@ -245,20 +208,14 @@ createApp({
                 }
             );
 
-
             let data = {};
 
-
             try {
-
                 data = await response.json();
-
             }
             catch (error) {
-
                 data = {};
             }
-
 
             if (response.status === 401) {
 
@@ -267,17 +224,13 @@ createApp({
                 );
 
                 this.token = null;
-
                 this.currentUser = null;
-
                 this.currentPage = "login";
-
 
                 throw new Error(
                     "Session expired. Please login again."
                 );
             }
-
 
             if (!response.ok) {
 
@@ -286,7 +239,6 @@ createApp({
                     `Request failed (${response.status})`
                 );
             }
-
 
             return data;
         },
@@ -300,21 +252,16 @@ createApp({
 
             this.clearMessages();
 
-
             if (
                 !this.loginForm.email ||
                 !this.loginForm.password
             ) {
-
                 this.errorMessage =
                     "Email and password are required.";
-
                 return;
             }
 
-
             this.loading = true;
-
 
             try {
 
@@ -338,96 +285,76 @@ createApp({
                     }
                 );
 
-
                 const data =
                     await response.json();
 
-
                 if (!response.ok) {
-
                     throw new Error(
                         data.message ||
                         "Login failed."
                     );
                 }
 
-
                 this.token =
                     data.access_token;
-
 
                 localStorage.setItem(
                     "access_token",
                     this.token
                 );
 
-
                 this.currentUser =
                     data.user;
-
 
                 await this.redirectByRole();
 
             }
             catch (error) {
-
                 this.errorMessage =
                     error.message;
             }
             finally {
-
                 this.loading = false;
             }
         },
 
 
         // =====================================================
-        // TREKKER REGISTRATION
+        // REGISTER
         // =====================================================
 
         async register() {
 
             this.clearMessages();
 
-
             if (
                 !this.registerForm.name ||
                 !this.registerForm.email ||
                 !this.registerForm.password
             ) {
-
                 this.errorMessage =
                     "Name, email and password are required.";
-
                 return;
             }
-
 
             if (
                 this.registerForm.password !==
                 this.registerForm.confirmPassword
             ) {
-
                 this.errorMessage =
                     "Passwords do not match.";
-
                 return;
             }
-
 
             if (
                 this.registerForm.password.length < 6
             ) {
-
                 this.errorMessage =
                     "Password must contain at least 6 characters.";
-
                 return;
             }
 
-
             this.loading = true;
-
 
             try {
 
@@ -457,19 +384,15 @@ createApp({
                     }
                 );
 
-
                 const data =
                     await response.json();
 
-
                 if (!response.ok) {
-
                     throw new Error(
                         data.message ||
                         "Registration failed."
                     );
                 }
-
 
                 this.registerForm = {
                     name: "",
@@ -479,22 +402,17 @@ createApp({
                     confirmPassword: ""
                 };
 
-
-                this.currentPage =
-                    "login";
-
+                this.currentPage = "login";
 
                 this.successMessage =
                     "Registration successful. Please login.";
 
             }
             catch (error) {
-
                 this.errorMessage =
                     error.message;
             }
             finally {
-
                 this.loading = false;
             }
         },
@@ -513,16 +431,13 @@ createApp({
                         "/api/auth/me"
                     );
 
-
                 this.currentUser =
                     data.user;
-
 
                 await this.redirectByRole();
 
             }
             catch (error) {
-
                 this.errorMessage =
                     error.message;
             }
@@ -536,13 +451,9 @@ createApp({
         async redirectByRole() {
 
             if (!this.currentUser) {
-
-                this.currentPage =
-                    "login";
-
+                this.currentPage = "login";
                 return;
             }
-
 
             if (
                 this.currentUser.role === "Admin"
@@ -554,7 +465,6 @@ createApp({
                 await this.loadAdminDashboard();
             }
 
-
             else if (
                 this.currentUser.role === "Staff"
             ) {
@@ -565,13 +475,14 @@ createApp({
                 await this.loadStaffDashboard();
             }
 
-
             else if (
                 this.currentUser.role === "Trekker"
             ) {
 
                 this.currentPage =
                     "trekker-dashboard";
+
+                await this.loadTrekkerDashboard();
             }
         },
 
@@ -596,39 +507,28 @@ createApp({
 
             }
             catch (error) {
-
-                console.log(
-                    "Logout API error:",
-                    error
-                );
+                console.log(error);
             }
-
 
             localStorage.removeItem(
                 "access_token"
             );
 
-
             this.token = null;
-
             this.currentUser = null;
-
-            this.currentPage =
-                "login";
-
+            this.currentPage = "login";
 
             this.loginForm = {
                 email: "",
                 password: ""
             };
 
-
             this.clearMessages();
         },
 
 
         // =====================================================
-        // PAGE NAVIGATION
+        // NAVIGATION
         // =====================================================
 
         async navigate(page) {
@@ -640,90 +540,70 @@ createApp({
 
             // ADMIN
 
-            if (
-                page ===
-                "admin-dashboard"
-            ) {
-
+            if (page === "admin-dashboard") {
                 await this.loadAdminDashboard();
             }
 
-
-            if (
-                page ===
-                "admin-treks"
-            ) {
-
+            if (page === "admin-treks") {
                 await this.loadTreks();
             }
 
-
-            if (
-                page ===
-                "admin-staff"
-            ) {
-
+            if (page === "admin-staff") {
                 await this.loadStaff();
-
                 await this.loadTreks();
             }
 
-
-            if (
-                page ===
-                "admin-users"
-            ) {
-
+            if (page === "admin-users") {
                 await this.loadUsers();
             }
 
-
-            if (
-                page ===
-                "admin-bookings"
-            ) {
-
+            if (page === "admin-bookings") {
                 await this.loadBookings();
             }
 
 
             // STAFF
 
-            if (
-                page ===
-                "staff-dashboard"
-            ) {
-
+            if (page === "staff-dashboard") {
                 await this.loadStaffDashboard();
             }
 
-
-            if (
-                page ===
-                "staff-treks"
-            ) {
-
+            if (page === "staff-treks") {
                 await this.loadStaffTreks();
             }
 
-
-            if (
-                page ===
-                "staff-participants"
-            ) {
+            if (page === "staff-participants") {
 
                 this.selectedStaffTrek = null;
 
                 await this.loadStaffParticipants();
             }
 
-
-            if (
-                page ===
-                "staff-profile"
-            ) {
-
+            if (page === "staff-profile") {
                 await this.loadStaffProfile();
+            }
+
+
+            // TREKKER
+
+            if (page === "trekker-dashboard") {
+                await this.loadTrekkerDashboard();
+            }
+
+            if (page === "trekker-treks") {
+                await this.loadAvailableTreks();
+            }
+
+            if (page === "trekker-bookings") {
+                await this.loadTrekkerBookings();
+            }
+
+            if (page === "trekker-history") {
+                await this.loadTrekkerHistory();
+            }
+
+            if (page === "trekker-profile") {
+                await this.loadTrekkerProfile();
             }
         },
 
@@ -741,13 +621,11 @@ createApp({
                         "/api/admin/dashboard"
                     );
 
-
                 this.adminStats =
                     data.stats;
 
             }
             catch (error) {
-
                 this.errorMessage =
                     error.message;
             }
@@ -755,7 +633,7 @@ createApp({
 
 
         // =====================================================
-        // ADMIN LOAD TREKS
+        // ADMIN TREKS
         // =====================================================
 
         async loadTreks() {
@@ -767,22 +645,16 @@ createApp({
                         "/api/admin/treks"
                     );
 
-
                 this.treks =
                     data.treks;
 
             }
             catch (error) {
-
                 this.errorMessage =
                     error.message;
             }
         },
 
-
-        // =====================================================
-        // RESET TREK FORM
-        // =====================================================
 
         resetTrekForm() {
 
@@ -799,40 +671,27 @@ createApp({
                 status: "Pending"
             };
 
-
             this.trekFormMode =
                 "create";
         },
 
 
-        // =====================================================
-        // CREATE / UPDATE TREK
-        // =====================================================
-
         async saveTrek() {
 
             this.clearMessages();
-
 
             if (
                 !this.trekForm.name ||
                 !this.trekForm.location
             ) {
-
                 this.errorMessage =
                     "Trek name and location are required.";
-
                 return;
             }
-
-
-            this.loading = true;
-
 
             try {
 
                 const payload = {
-
                     name:
                         this.trekForm.name,
 
@@ -865,7 +724,6 @@ createApp({
                         this.trekForm.status
                 };
 
-
                 if (
                     this.trekFormMode ===
                     "create"
@@ -882,7 +740,6 @@ createApp({
                                 )
                         }
                     );
-
 
                     this.successMessage =
                         "Trek created successfully.";
@@ -902,14 +759,11 @@ createApp({
                         }
                     );
 
-
                     this.successMessage =
                         "Trek updated successfully.";
                 }
 
-
                 this.resetTrekForm();
-
 
                 await this.loadTreks();
 
@@ -917,63 +771,28 @@ createApp({
 
             }
             catch (error) {
-
                 this.errorMessage =
                     error.message;
-            }
-            finally {
-
-                this.loading = false;
             }
         },
 
 
-        // =====================================================
-        // EDIT TREK
-        // =====================================================
-
         editTrek(trek) {
 
-            this.clearMessages();
-
-
-            this.trekFormMode =
-                "edit";
-
+            this.trekFormMode = "edit";
 
             this.trekForm = {
-
-                id:
-                    trek.id,
-
-                name:
-                    trek.name,
-
-                location:
-                    trek.location,
-
-                difficulty:
-                    trek.difficulty,
-
-                duration:
-                    trek.duration,
-
-                total_slots:
-                    trek.total_slots,
-
-                description:
-                    trek.description || "",
-
-                start_date:
-                    trek.start_date || "",
-
-                end_date:
-                    trek.end_date || "",
-
-                status:
-                    trek.status
+                id: trek.id,
+                name: trek.name,
+                location: trek.location,
+                difficulty: trek.difficulty,
+                duration: trek.duration,
+                total_slots: trek.total_slots,
+                description: trek.description || "",
+                start_date: trek.start_date || "",
+                end_date: trek.end_date || "",
+                status: trek.status
             };
-
 
             window.scrollTo({
                 top: 0,
@@ -982,26 +801,15 @@ createApp({
         },
 
 
-        // =====================================================
-        // DELETE TREK
-        // =====================================================
-
         async deleteTrek(trek) {
 
-            const confirmed =
-                confirm(
+            if (
+                !confirm(
                     `Delete "${trek.name}"?`
-                );
-
-
-            if (!confirmed) {
-
+                )
+            ) {
                 return;
             }
-
-
-            this.clearMessages();
-
 
             try {
 
@@ -1013,10 +821,8 @@ createApp({
                         }
                     );
 
-
                 this.successMessage =
                     data.message;
-
 
                 await this.loadTreks();
 
@@ -1024,7 +830,6 @@ createApp({
 
             }
             catch (error) {
-
                 this.errorMessage =
                     error.message;
             }
@@ -1032,7 +837,7 @@ createApp({
 
 
         // =====================================================
-        // ADMIN LOAD STAFF
+        // ADMIN STAFF
         // =====================================================
 
         async loadStaff() {
@@ -1044,40 +849,30 @@ createApp({
                         "/api/admin/staff"
                     );
 
-
                 this.staff =
                     data.staff;
 
             }
             catch (error) {
-
                 this.errorMessage =
                     error.message;
             }
         },
 
 
-        // =====================================================
-        // ADMIN CREATE STAFF
-        // =====================================================
-
         async createStaff() {
 
             this.clearMessages();
-
 
             if (
                 !this.staffForm.name ||
                 !this.staffForm.email ||
                 !this.staffForm.password
             ) {
-
                 this.errorMessage =
                     "Name, email and password are required.";
-
                 return;
             }
-
 
             try {
 
@@ -1094,10 +889,8 @@ createApp({
                         }
                     );
 
-
                 this.successMessage =
                     data.message;
-
 
                 this.staffForm = {
                     name: "",
@@ -1110,40 +903,29 @@ createApp({
                     address: ""
                 };
 
-
                 await this.loadStaff();
-
                 await this.loadAdminDashboard();
 
             }
             catch (error) {
-
                 this.errorMessage =
                     error.message;
             }
         },
 
 
-        // =====================================================
-        // ADMIN ASSIGN STAFF
-        // =====================================================
-
         async assignStaff() {
 
             this.clearMessages();
-
 
             if (
                 !this.assignForm.trek_id ||
                 !this.assignForm.staff_id
             ) {
-
                 this.errorMessage =
-                    "Select both trek and staff member.";
-
+                    "Select trek and staff.";
                 return;
             }
-
 
             try {
 
@@ -1163,24 +945,19 @@ createApp({
                         }
                     );
 
-
                 this.successMessage =
                     data.message;
-
 
                 this.assignForm = {
                     trek_id: "",
                     staff_id: ""
                 };
 
-
                 await this.loadTreks();
-
                 await this.loadStaff();
 
             }
             catch (error) {
-
                 this.errorMessage =
                     error.message;
             }
@@ -1200,30 +977,21 @@ createApp({
                         "/api/admin/users"
                     );
 
-
                 this.users =
                     data.users;
 
             }
             catch (error) {
-
                 this.errorMessage =
                     error.message;
             }
         },
 
 
-        // =====================================================
-        // USER BLACKLIST
-        // =====================================================
-
         async setUserBlacklist(
             user,
             blacklisted
         ) {
-
-            this.clearMessages();
-
 
             try {
 
@@ -1245,35 +1013,25 @@ createApp({
                     }
                 );
 
-
                 this.successMessage =
                     blacklisted
-                        ? `${user.name} blacklisted.`
-                        : `${user.name} removed from blacklist.`;
-
+                        ? "User blacklisted."
+                        : "Blacklist removed.";
 
                 await this.loadUsers();
 
             }
             catch (error) {
-
                 this.errorMessage =
                     error.message;
             }
         },
 
 
-        // =====================================================
-        // ACTIVATE / DEACTIVATE USER
-        // =====================================================
-
         async setUserActive(
             user,
             active
         ) {
-
-            this.clearMessages();
-
 
             try {
 
@@ -1295,18 +1053,15 @@ createApp({
                     }
                 );
 
-
                 this.successMessage =
                     active
-                        ? `${user.name} activated.`
-                        : `${user.name} deactivated.`;
-
+                        ? "User activated."
+                        : "User deactivated.";
 
                 await this.loadUsers();
 
             }
             catch (error) {
-
                 this.errorMessage =
                     error.message;
             }
@@ -1326,13 +1081,11 @@ createApp({
                         "/api/admin/bookings"
                     );
 
-
                 this.bookings =
                     data.bookings;
 
             }
             catch (error) {
-
                 this.errorMessage =
                     error.message;
             }
@@ -1345,9 +1098,6 @@ createApp({
 
         async performSearch() {
 
-            this.clearMessages();
-
-
             if (!this.searchQuery.trim()) {
 
                 this.searchResults = {
@@ -1359,7 +1109,6 @@ createApp({
                 return;
             }
 
-
             try {
 
                 const data =
@@ -1369,21 +1118,14 @@ createApp({
                         )}`
                     );
 
-
                 this.searchResults = {
-                    treks:
-                        data.treks,
-
-                    users:
-                        data.users,
-
-                    staff:
-                        data.staff
+                    treks: data.treks,
+                    users: data.users,
+                    staff: data.staff
                 };
 
             }
             catch (error) {
-
                 this.errorMessage =
                     error.message;
             }
@@ -1391,13 +1133,10 @@ createApp({
 
 
         // =====================================================
-        // STAFF DASHBOARD
+        // STAFF
         // =====================================================
 
         async loadStaffDashboard() {
-
-            this.clearMessages();
-
 
             try {
 
@@ -1406,27 +1145,18 @@ createApp({
                         "/api/staff/dashboard"
                     );
 
-
                 this.staffStats =
                     data.stats;
 
             }
             catch (error) {
-
                 this.errorMessage =
                     error.message;
             }
         },
 
 
-        // =====================================================
-        // STAFF TREKS
-        // =====================================================
-
         async loadStaffTreks() {
-
-            this.clearMessages();
-
 
             try {
 
@@ -1435,81 +1165,36 @@ createApp({
                         "/api/staff/treks"
                     );
 
-
                 this.staffTreks =
                     data.treks;
 
             }
             catch (error) {
-
                 this.errorMessage =
                     error.message;
             }
         },
 
 
-        // =====================================================
-        // SELECT STAFF TREK
-        // =====================================================
-
         selectStaffTrek(trek) {
-
-            this.clearMessages();
-
 
             this.selectedStaffTrek = {
                 ...trek
             };
 
-
             this.staffSlotForm.total_slots =
                 trek.total_slots;
 
-
-            this.staffStatusForm.status =
-                trek.status;
-
-
             this.currentPage =
                 "staff-manage-trek";
-
-
-            window.scrollTo({
-                top: 0,
-                behavior: "smooth"
-            });
         },
 
 
-        // =====================================================
-        // STAFF UPDATE SLOTS
-        // =====================================================
-
         async updateStaffSlots() {
 
-            this.clearMessages();
-
-
             if (!this.selectedStaffTrek) {
-
                 return;
             }
-
-
-            const totalSlots =
-                Number(
-                    this.staffSlotForm.total_slots
-                );
-
-
-            if (totalSlots <= 0) {
-
-                this.errorMessage =
-                    "Total slots must be greater than 0.";
-
-                return;
-            }
-
 
             try {
 
@@ -1522,61 +1207,45 @@ createApp({
                             body:
                                 JSON.stringify({
                                     total_slots:
-                                        totalSlots
+                                        Number(
+                                            this.staffSlotForm.total_slots
+                                        )
                                 })
                         }
                     );
 
-
                 this.successMessage =
                     data.message;
-
 
                 this.selectedStaffTrek.total_slots =
                     data.total_slots;
 
-
                 this.selectedStaffTrek.available_slots =
                     data.available_slots;
-
 
                 await this.loadStaffTreks();
 
             }
             catch (error) {
-
                 this.errorMessage =
                     error.message;
             }
         },
 
 
-        // =====================================================
-        // STAFF UPDATE STATUS
-        // =====================================================
-
         async updateStaffStatus(status) {
 
-            this.clearMessages();
-
-
             if (!this.selectedStaffTrek) {
-
                 return;
             }
 
-
-            const confirmed =
-                confirm(
-                    `Change trek status to ${status}?`
-                );
-
-
-            if (!confirmed) {
-
+            if (
+                !confirm(
+                    `Change status to ${status}?`
+                )
+            ) {
                 return;
             }
-
 
             try {
 
@@ -1593,40 +1262,24 @@ createApp({
                         }
                     );
 
-
                 this.successMessage =
                     data.message;
-
 
                 this.selectedStaffTrek.status =
                     status;
 
-
-                this.staffStatusForm.status =
-                    status;
-
-
                 await this.loadStaffTreks();
-
                 await this.loadStaffDashboard();
 
             }
             catch (error) {
-
                 this.errorMessage =
                     error.message;
             }
         },
 
 
-        // =====================================================
-        // ALL STAFF PARTICIPANTS
-        // =====================================================
-
         async loadStaffParticipants() {
-
-            this.clearMessages();
-
 
             try {
 
@@ -1635,27 +1288,18 @@ createApp({
                         "/api/staff/participants"
                     );
 
-
                 this.staffParticipants =
                     data.participants;
 
             }
             catch (error) {
-
                 this.errorMessage =
                     error.message;
             }
         },
 
 
-        // =====================================================
-        // ONE TREK PARTICIPANTS
-        // =====================================================
-
         async viewTrekParticipants(trek) {
-
-            this.clearMessages();
-
 
             try {
 
@@ -1664,17 +1308,191 @@ createApp({
                         `/api/staff/treks/${trek.id}/participants`
                     );
 
-
                 this.selectedStaffTrek =
                     trek;
-
 
                 this.staffParticipants =
                     data.participants;
 
-
                 this.currentPage =
                     "staff-participants";
+
+            }
+            catch (error) {
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        async loadStaffProfile() {
+
+            try {
+
+                const data =
+                    await this.apiRequest(
+                        "/api/staff/profile"
+                    );
+
+                this.staffProfile =
+                    data.profile;
+
+            }
+            catch (error) {
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        // =====================================================
+        // TREKKER DASHBOARD
+        // =====================================================
+
+        async loadTrekkerDashboard() {
+
+            try {
+
+                const data =
+                    await this.apiRequest(
+                        "/api/trekker/dashboard"
+                    );
+
+                this.trekkerStats =
+                    data.stats;
+
+            }
+            catch (error) {
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        // =====================================================
+        // AVAILABLE TREKS
+        // =====================================================
+
+        async loadAvailableTreks() {
+
+            this.clearMessages();
+
+            try {
+
+                const parameters =
+                    new URLSearchParams();
+
+
+                if (
+                    this.trekFilters.search.trim()
+                ) {
+
+                    parameters.append(
+                        "search",
+                        this.trekFilters.search.trim()
+                    );
+                }
+
+
+                if (
+                    this.trekFilters.difficulty
+                ) {
+
+                    parameters.append(
+                        "difficulty",
+                        this.trekFilters.difficulty
+                    );
+                }
+
+
+                if (
+                    this.trekFilters.location.trim()
+                ) {
+
+                    parameters.append(
+                        "location",
+                        this.trekFilters.location.trim()
+                    );
+                }
+
+
+                if (
+                    this.trekFilters.duration
+                ) {
+
+                    parameters.append(
+                        "duration",
+                        this.trekFilters.duration
+                    );
+                }
+
+
+                let url =
+                    "/api/trekker/treks";
+
+
+                const queryString =
+                    parameters.toString();
+
+
+                if (queryString) {
+
+                    url +=
+                        `?${queryString}`;
+                }
+
+
+                const data =
+                    await this.apiRequest(
+                        url
+                    );
+
+
+                this.availableTreks =
+                    data.treks;
+
+            }
+            catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        clearTrekFilters() {
+
+            this.trekFilters = {
+                search: "",
+                difficulty: "",
+                location: "",
+                duration: ""
+            };
+
+            this.loadAvailableTreks();
+        },
+
+
+        // =====================================================
+        // TREK DETAILS
+        // =====================================================
+
+        async viewTrekDetails(trek) {
+
+            this.clearMessages();
+
+            try {
+
+                const data =
+                    await this.apiRequest(
+                        `/api/trekker/treks/${trek.id}`
+                    );
+
+                this.selectedTrek =
+                    data.trek;
+
+                this.currentPage =
+                    "trekker-trek-details";
 
             }
             catch (error) {
@@ -1686,24 +1504,248 @@ createApp({
 
 
         // =====================================================
-        // STAFF PROFILE
+        // BOOK TREK
         // =====================================================
 
-        async loadStaffProfile() {
+        async bookTrek(trek) {
 
             this.clearMessages();
+
+
+            if (
+                !confirm(
+                    `Book "${trek.name}"?`
+                )
+            ) {
+                return;
+            }
 
 
             try {
 
                 const data =
                     await this.apiRequest(
-                        "/api/staff/profile"
+                        `/api/trekker/treks/${trek.id}/book`,
+                        {
+                            method: "POST"
+                        }
                     );
 
 
-                this.staffProfile =
+                this.successMessage =
+                    data.message;
+
+
+                await this.loadTrekkerDashboard();
+
+                await this.loadAvailableTreks();
+
+
+                if (
+                    this.selectedTrek &&
+                    this.selectedTrek.id === trek.id
+                ) {
+
+                    const details =
+                        await this.apiRequest(
+                            `/api/trekker/treks/${trek.id}`
+                        );
+
+                    this.selectedTrek =
+                        details.trek;
+                }
+
+            }
+            catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        // =====================================================
+        // MY BOOKINGS
+        // =====================================================
+
+        async loadTrekkerBookings() {
+
+            this.clearMessages();
+
+            try {
+
+                const data =
+                    await this.apiRequest(
+                        "/api/trekker/bookings"
+                    );
+
+                this.trekkerBookings =
+                    data.bookings;
+
+            }
+            catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        // =====================================================
+        // CANCEL BOOKING
+        // =====================================================
+
+        async cancelBooking(booking) {
+
+            this.clearMessages();
+
+
+            if (
+                !confirm(
+                    `Cancel booking for "${booking.trek_name}"?`
+                )
+            ) {
+                return;
+            }
+
+
+            try {
+
+                const data =
+                    await this.apiRequest(
+                        `/api/trekker/bookings/${booking.id}/cancel`,
+                        {
+                            method: "PATCH"
+                        }
+                    );
+
+
+                this.successMessage =
+                    data.message;
+
+
+                await this.loadTrekkerBookings();
+
+                await this.loadTrekkerDashboard();
+
+            }
+            catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        // =====================================================
+        // HISTORY
+        // =====================================================
+
+        async loadTrekkerHistory() {
+
+            this.clearMessages();
+
+            try {
+
+                const data =
+                    await this.apiRequest(
+                        "/api/trekker/history"
+                    );
+
+                this.trekkerHistory =
+                    data.history;
+
+            }
+            catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        // =====================================================
+        // PROFILE
+        // =====================================================
+
+        async loadTrekkerProfile() {
+
+            this.clearMessages();
+
+            try {
+
+                const data =
+                    await this.apiRequest(
+                        "/api/trekker/profile"
+                    );
+
+                this.trekkerProfile =
                     data.profile;
+
+
+                this.trekkerProfileForm = {
+                    name:
+                        data.profile.name,
+
+                    phone:
+                        data.profile.phone || ""
+                };
+
+            }
+            catch (error) {
+
+                this.errorMessage =
+                    error.message;
+            }
+        },
+
+
+        async updateTrekkerProfile() {
+
+            this.clearMessages();
+
+
+            if (
+                !this.trekkerProfileForm.name.trim()
+            ) {
+
+                this.errorMessage =
+                    "Name is required.";
+
+                return;
+            }
+
+
+            try {
+
+                const data =
+                    await this.apiRequest(
+                        "/api/trekker/profile",
+                        {
+                            method: "PUT",
+
+                            body:
+                                JSON.stringify({
+                                    name:
+                                        this.trekkerProfileForm.name,
+
+                                    phone:
+                                        this.trekkerProfileForm.phone
+                                })
+                        }
+                    );
+
+
+                this.trekkerProfile =
+                    data.profile;
+
+
+                this.currentUser.name =
+                    data.profile.name;
+
+
+                this.successMessage =
+                    data.message;
 
             }
             catch (error) {
@@ -1716,7 +1758,7 @@ createApp({
 
 
     // =========================================================
-    // HTML TEMPLATE
+    // TEMPLATE
     // =========================================================
 
     template: `
@@ -1724,7 +1766,7 @@ createApp({
     <div>
 
         <!-- ================================================= -->
-        <!-- LOGIN PAGE -->
+        <!-- LOGIN -->
         <!-- ================================================= -->
 
         <div
@@ -1763,7 +1805,6 @@ createApp({
 
                     <form @submit.prevent="login">
 
-
                         <div class="mb-3">
 
                             <label class="form-label">
@@ -1774,7 +1815,6 @@ createApp({
                                 v-model.trim="loginForm.email"
                                 type="email"
                                 class="form-control"
-                                placeholder="Enter email"
                             >
 
                         </div>
@@ -1790,14 +1830,12 @@ createApp({
                                 v-model="loginForm.password"
                                 type="password"
                                 class="form-control"
-                                placeholder="Enter password"
                             >
 
                         </div>
 
 
                         <button
-                            type="submit"
                             class="btn btn-primary w-100"
                             :disabled="loading"
                         >
@@ -1839,7 +1877,7 @@ createApp({
 
 
         <!-- ================================================= -->
-        <!-- REGISTER PAGE -->
+        <!-- REGISTER -->
         <!-- ================================================= -->
 
         <div
@@ -1854,11 +1892,6 @@ createApp({
                     <h2 class="fw-bold text-center">
                         Trekker Registration
                     </h2>
-
-
-                    <p class="text-muted text-center">
-                        Create a Trekker account
-                    </p>
 
 
                     <div
@@ -1877,14 +1910,12 @@ createApp({
                             placeholder="Full Name"
                         >
 
-
                         <input
                             v-model.trim="registerForm.email"
-                            class="form-control mb-3"
                             type="email"
+                            class="form-control mb-3"
                             placeholder="Email"
                         >
-
 
                         <input
                             v-model.trim="registerForm.phone"
@@ -1892,26 +1923,23 @@ createApp({
                             placeholder="Phone"
                         >
 
-
                         <input
                             v-model="registerForm.password"
-                            class="form-control mb-3"
                             type="password"
+                            class="form-control mb-3"
                             placeholder="Password"
                         >
 
-
                         <input
                             v-model="registerForm.confirmPassword"
-                            class="form-control mb-3"
                             type="password"
+                            class="form-control mb-3"
                             placeholder="Confirm Password"
                         >
 
 
                         <button
                             class="btn btn-success w-100"
-                            :disabled="loading"
                         >
                             Register
                         </button>
@@ -1941,10 +1969,10 @@ createApp({
 
 
         <!-- ================================================= -->
-        <!-- LOGGED IN APP -->
+        <!-- LOGGED IN -->
         <!-- ================================================= -->
 
-        <div v-else class="app-container">
+        <div v-else>
 
 
             <!-- NAVBAR -->
@@ -1954,23 +1982,20 @@ createApp({
             >
 
                 <span class="navbar-brand fw-bold">
-
                     Trekking Management V2
-
                 </span>
 
 
-                <div
-                    class="d-flex align-items-center"
-                >
+                <div class="text-light">
 
-                    <span
-                        v-if="currentUser"
-                        class="text-light"
-                    >
+                    <span v-if="currentUser">
+
                         {{ currentUser.name }}
+
                         |
+
                         {{ currentUser.role }}
+
                     </span>
 
 
@@ -1984,7 +2009,6 @@ createApp({
                 </div>
 
             </nav>
-
 
 
             <div class="container-fluid">
@@ -2011,16 +2035,8 @@ createApp({
 
                         <button
                             class="nav-link text-start"
-                            :class="{
-                                active:
-                                currentPage ===
-                                'admin-dashboard'
-                            }"
-                            @click="
-                                navigate(
-                                    'admin-dashboard'
-                                )
-                            "
+                            :class="{active: currentPage==='admin-dashboard'}"
+                            @click="navigate('admin-dashboard')"
                         >
                             Dashboard
                         </button>
@@ -2028,16 +2044,8 @@ createApp({
 
                         <button
                             class="nav-link text-start"
-                            :class="{
-                                active:
-                                currentPage ===
-                                'admin-treks'
-                            }"
-                            @click="
-                                navigate(
-                                    'admin-treks'
-                                )
-                            "
+                            :class="{active: currentPage==='admin-treks'}"
+                            @click="navigate('admin-treks')"
                         >
                             Manage Treks
                         </button>
@@ -2045,16 +2053,8 @@ createApp({
 
                         <button
                             class="nav-link text-start"
-                            :class="{
-                                active:
-                                currentPage ===
-                                'admin-staff'
-                            }"
-                            @click="
-                                navigate(
-                                    'admin-staff'
-                                )
-                            "
+                            :class="{active: currentPage==='admin-staff'}"
+                            @click="navigate('admin-staff')"
                         >
                             Trek Staff
                         </button>
@@ -2062,16 +2062,8 @@ createApp({
 
                         <button
                             class="nav-link text-start"
-                            :class="{
-                                active:
-                                currentPage ===
-                                'admin-users'
-                            }"
-                            @click="
-                                navigate(
-                                    'admin-users'
-                                )
-                            "
+                            :class="{active: currentPage==='admin-users'}"
+                            @click="navigate('admin-users')"
                         >
                             Users
                         </button>
@@ -2079,16 +2071,8 @@ createApp({
 
                         <button
                             class="nav-link text-start"
-                            :class="{
-                                active:
-                                currentPage ===
-                                'admin-bookings'
-                            }"
-                            @click="
-                                navigate(
-                                    'admin-bookings'
-                                )
-                            "
+                            :class="{active: currentPage==='admin-bookings'}"
+                            @click="navigate('admin-bookings')"
                         >
                             Bookings
                         </button>
@@ -2096,16 +2080,8 @@ createApp({
 
                         <button
                             class="nav-link text-start"
-                            :class="{
-                                active:
-                                currentPage ===
-                                'admin-search'
-                            }"
-                            @click="
-                                navigate(
-                                    'admin-search'
-                                )
-                            "
+                            :class="{active: currentPage==='admin-search'}"
+                            @click="navigate('admin-search')"
                         >
                             Search
                         </button>
@@ -2133,16 +2109,8 @@ createApp({
 
                         <button
                             class="nav-link text-start"
-                            :class="{
-                                active:
-                                currentPage ===
-                                'staff-dashboard'
-                            }"
-                            @click="
-                                navigate(
-                                    'staff-dashboard'
-                                )
-                            "
+                            :class="{active: currentPage==='staff-dashboard'}"
+                            @click="navigate('staff-dashboard')"
                         >
                             Dashboard
                         </button>
@@ -2152,16 +2120,11 @@ createApp({
                             class="nav-link text-start"
                             :class="{
                                 active:
-                                currentPage ===
-                                'staff-treks' ||
-                                currentPage ===
-                                'staff-manage-trek'
+                                currentPage==='staff-treks'
+                                ||
+                                currentPage==='staff-manage-trek'
                             }"
-                            @click="
-                                navigate(
-                                    'staff-treks'
-                                )
-                            "
+                            @click="navigate('staff-treks')"
                         >
                             My Treks
                         </button>
@@ -2169,16 +2132,8 @@ createApp({
 
                         <button
                             class="nav-link text-start"
-                            :class="{
-                                active:
-                                currentPage ===
-                                'staff-participants'
-                            }"
-                            @click="
-                                navigate(
-                                    'staff-participants'
-                                )
-                            "
+                            :class="{active: currentPage==='staff-participants'}"
+                            @click="navigate('staff-participants')"
                         >
                             Participants
                         </button>
@@ -2186,16 +2141,8 @@ createApp({
 
                         <button
                             class="nav-link text-start"
-                            :class="{
-                                active:
-                                currentPage ===
-                                'staff-profile'
-                            }"
-                            @click="
-                                navigate(
-                                    'staff-profile'
-                                )
-                            "
+                            :class="{active: currentPage==='staff-profile'}"
+                            @click="navigate('staff-profile')"
                         >
                             Profile
                         </button>
@@ -2222,9 +2169,52 @@ createApp({
 
 
                         <button
-                            class="nav-link active text-start"
+                            class="nav-link text-start"
+                            :class="{active: currentPage==='trekker-dashboard'}"
+                            @click="navigate('trekker-dashboard')"
                         >
                             Dashboard
+                        </button>
+
+
+                        <button
+                            class="nav-link text-start"
+                            :class="{
+                                active:
+                                currentPage==='trekker-treks'
+                                ||
+                                currentPage==='trekker-trek-details'
+                            }"
+                            @click="navigate('trekker-treks')"
+                        >
+                            Browse Treks
+                        </button>
+
+
+                        <button
+                            class="nav-link text-start"
+                            :class="{active: currentPage==='trekker-bookings'}"
+                            @click="navigate('trekker-bookings')"
+                        >
+                            My Bookings
+                        </button>
+
+
+                        <button
+                            class="nav-link text-start"
+                            :class="{active: currentPage==='trekker-history'}"
+                            @click="navigate('trekker-history')"
+                        >
+                            History
+                        </button>
+
+
+                        <button
+                            class="nav-link text-start"
+                            :class="{active: currentPage==='trekker-profile'}"
+                            @click="navigate('trekker-profile')"
+                        >
+                            Profile
                         </button>
 
                     </aside>
@@ -2232,7 +2222,7 @@ createApp({
 
 
                     <!-- ================================================= -->
-                    <!-- MAIN CONTENT -->
+                    <!-- MAIN -->
                     <!-- ================================================= -->
 
                     <main
@@ -2262,10 +2252,7 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-if="
-                                currentPage ===
-                                'admin-dashboard'
-                            "
+                            v-if="currentPage==='admin-dashboard'"
                         >
 
                             <h2 class="fw-bold mb-4">
@@ -2275,11 +2262,8 @@ createApp({
 
                             <div class="row g-3">
 
-
                                 <div class="col-md-4 col-lg-2">
-
                                     <div class="card dashboard-card">
-
                                         <div class="card-body text-center">
 
                                             <h3>
@@ -2287,20 +2271,16 @@ createApp({
                                             </h3>
 
                                             <span class="text-muted">
-                                                Total Treks
+                                                Treks
                                             </span>
 
                                         </div>
-
                                     </div>
-
                                 </div>
 
 
                                 <div class="col-md-4 col-lg-2">
-
                                     <div class="card dashboard-card">
-
                                         <div class="card-body text-center">
 
                                             <h3>
@@ -2312,16 +2292,12 @@ createApp({
                                             </span>
 
                                         </div>
-
                                     </div>
-
                                 </div>
 
 
                                 <div class="col-md-4 col-lg-2">
-
                                     <div class="card dashboard-card">
-
                                         <div class="card-body text-center">
 
                                             <h3>
@@ -2333,16 +2309,12 @@ createApp({
                                             </span>
 
                                         </div>
-
                                     </div>
-
                                 </div>
 
 
                                 <div class="col-md-4 col-lg-2">
-
                                     <div class="card dashboard-card">
-
                                         <div class="card-body text-center">
 
                                             <h3>
@@ -2354,16 +2326,12 @@ createApp({
                                             </span>
 
                                         </div>
-
                                     </div>
-
                                 </div>
 
 
                                 <div class="col-md-4 col-lg-2">
-
                                     <div class="card dashboard-card">
-
                                         <div class="card-body text-center">
 
                                             <h3>
@@ -2375,16 +2343,12 @@ createApp({
                                             </span>
 
                                         </div>
-
                                     </div>
-
                                 </div>
 
 
                                 <div class="col-md-4 col-lg-2">
-
                                     <div class="card dashboard-card">
-
                                         <div class="card-body text-center">
 
                                             <h3>
@@ -2396,9 +2360,7 @@ createApp({
                                             </span>
 
                                         </div>
-
                                     </div>
-
                                 </div>
 
                             </div>
@@ -2412,10 +2374,7 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="
-                                currentPage ===
-                                'admin-treks'
-                            "
+                            v-else-if="currentPage==='admin-treks'"
                         >
 
                             <h2 class="fw-bold">
@@ -2430,8 +2389,7 @@ createApp({
                                     <h5>
 
                                         {{
-                                            trekFormMode ===
-                                            'create'
+                                            trekFormMode === 'create'
                                             ? 'Create New Trek'
                                             : 'Edit Trek'
                                         }}
@@ -2439,12 +2397,9 @@ createApp({
                                     </h5>
 
 
-                                    <form
-                                        @submit.prevent="saveTrek"
-                                    >
+                                    <form @submit.prevent="saveTrek">
 
                                         <div class="row g-3">
-
 
                                             <div class="col-md-6">
 
@@ -2484,19 +2439,9 @@ createApp({
                                                     v-model="trekForm.difficulty"
                                                     class="form-select"
                                                 >
-
-                                                    <option>
-                                                        Easy
-                                                    </option>
-
-                                                    <option>
-                                                        Moderate
-                                                    </option>
-
-                                                    <option>
-                                                        Hard
-                                                    </option>
-
+                                                    <option>Easy</option>
+                                                    <option>Moderate</option>
+                                                    <option>Hard</option>
                                                 </select>
 
                                             </div>
@@ -2574,31 +2519,12 @@ createApp({
                                                     v-model="trekForm.status"
                                                     class="form-select"
                                                 >
-
-                                                    <option>
-                                                        Pending
-                                                    </option>
-
-                                                    <option>
-                                                        Approved
-                                                    </option>
-
-                                                    <option>
-                                                        Open
-                                                    </option>
-
-                                                    <option>
-                                                        Closed
-                                                    </option>
-
-                                                    <option>
-                                                        Ongoing
-                                                    </option>
-
-                                                    <option>
-                                                        Completed
-                                                    </option>
-
+                                                    <option>Pending</option>
+                                                    <option>Approved</option>
+                                                    <option>Open</option>
+                                                    <option>Closed</option>
+                                                    <option>Ongoing</option>
+                                                    <option>Completed</option>
                                                 </select>
 
                                             </div>
@@ -2606,14 +2532,10 @@ createApp({
 
                                             <div class="col-12">
 
-                                                <label class="form-label">
-                                                    Description
-                                                </label>
-
                                                 <textarea
                                                     v-model.trim="trekForm.description"
                                                     class="form-control"
-                                                    rows="3"
+                                                    placeholder="Description"
                                                 ></textarea>
 
                                             </div>
@@ -2625,8 +2547,7 @@ createApp({
                                                     class="btn btn-primary"
                                                 >
                                                     {{
-                                                        trekFormMode ===
-                                                        'create'
+                                                        trekFormMode==='create'
                                                         ? 'Create Trek'
                                                         : 'Save Changes'
                                                     }}
@@ -2634,15 +2555,12 @@ createApp({
 
 
                                                 <button
-                                                    v-if="
-                                                        trekFormMode ===
-                                                        'edit'
-                                                    "
+                                                    v-if="trekFormMode==='edit'"
                                                     type="button"
                                                     class="btn btn-secondary ms-2"
                                                     @click="resetTrekForm"
                                                 >
-                                                    Cancel Edit
+                                                    Cancel
                                                 </button>
 
                                             </div>
@@ -2656,35 +2574,21 @@ createApp({
                             </div>
 
 
+                            <div class="table-responsive table-container">
 
-                            <div
-                                class="table-responsive table-container"
-                            >
-
-                                <table
-                                    class="table table-hover align-middle"
-                                >
+                                <table class="table table-hover">
 
                                     <thead>
 
                                         <tr>
-
                                             <th>ID</th>
-
                                             <th>Trek</th>
-
                                             <th>Location</th>
-
                                             <th>Difficulty</th>
-
                                             <th>Slots</th>
-
                                             <th>Staff</th>
-
                                             <th>Status</th>
-
-                                            <th>Actions</th>
-
+                                            <th>Action</th>
                                         </tr>
 
                                     </thead>
@@ -2720,60 +2624,29 @@ createApp({
                                             </td>
 
                                             <td>
-                                                {{
-                                                    trek.assigned_staff
-                                                    ||
-                                                    'Not Assigned'
-                                                }}
+                                                {{ trek.assigned_staff || 'Not Assigned' }}
                                             </td>
 
                                             <td>
-
-                                                <span
-                                                    class="badge bg-secondary"
-                                                >
-                                                    {{ trek.status }}
-                                                </span>
-
+                                                {{ trek.status }}
                                             </td>
 
                                             <td>
 
                                                 <button
-                                                    class="btn btn-warning btn-sm me-2"
-                                                    @click="
-                                                        editTrek(trek)
-                                                    "
+                                                    class="btn btn-warning btn-sm me-1"
+                                                    @click="editTrek(trek)"
                                                 >
                                                     Edit
                                                 </button>
 
-
                                                 <button
                                                     class="btn btn-danger btn-sm"
-                                                    @click="
-                                                        deleteTrek(trek)
-                                                    "
+                                                    @click="deleteTrek(trek)"
                                                 >
                                                     Delete
                                                 </button>
 
-                                            </td>
-
-                                        </tr>
-
-
-                                        <tr
-                                            v-if="
-                                                treks.length === 0
-                                            "
-                                        >
-
-                                            <td
-                                                colspan="8"
-                                                class="text-center text-muted"
-                                            >
-                                                No treks found.
                                             </td>
 
                                         </tr>
@@ -2793,10 +2666,7 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="
-                                currentPage ===
-                                'admin-staff'
-                            "
+                            v-else-if="currentPage==='admin-staff'"
                         >
 
                             <h2 class="fw-bold">
@@ -2804,8 +2674,7 @@ createApp({
                             </h2>
 
 
-                            <div class="row g-4 my-3">
-
+                            <div class="row g-4 my-4">
 
                                 <div class="col-lg-7">
 
@@ -2813,115 +2682,82 @@ createApp({
 
                                         <div class="card-body">
 
-                                            <h5>
-                                                Create Staff
-                                            </h5>
+                                            <h5>Create Staff</h5>
 
 
-                                            <form
-                                                @submit.prevent="
-                                                    createStaff
-                                                "
-                                            >
+                                            <form @submit.prevent="createStaff">
 
                                                 <div class="row g-3">
 
-
                                                     <div class="col-md-6">
-
                                                         <input
-                                                            v-model.trim="staffForm.name"
+                                                            v-model="staffForm.name"
                                                             class="form-control"
                                                             placeholder="Name"
                                                         >
-
                                                     </div>
 
-
                                                     <div class="col-md-6">
-
                                                         <input
-                                                            v-model.trim="staffForm.email"
-                                                            type="email"
+                                                            v-model="staffForm.email"
                                                             class="form-control"
                                                             placeholder="Email"
                                                         >
-
                                                     </div>
 
-
                                                     <div class="col-md-6">
-
                                                         <input
                                                             v-model="staffForm.password"
                                                             type="password"
                                                             class="form-control"
                                                             placeholder="Password"
                                                         >
-
                                                     </div>
 
-
                                                     <div class="col-md-6">
-
                                                         <input
-                                                            v-model.trim="staffForm.phone"
+                                                            v-model="staffForm.phone"
                                                             class="form-control"
                                                             placeholder="Phone"
                                                         >
-
                                                     </div>
 
-
                                                     <div class="col-md-6">
-
                                                         <input
-                                                            v-model.trim="staffForm.experience"
+                                                            v-model="staffForm.experience"
                                                             class="form-control"
                                                             placeholder="Experience"
                                                         >
-
                                                     </div>
 
-
                                                     <div class="col-md-6">
-
                                                         <input
-                                                            v-model.trim="staffForm.specialization"
+                                                            v-model="staffForm.specialization"
                                                             class="form-control"
                                                             placeholder="Specialization"
                                                         >
-
                                                     </div>
 
-
                                                     <div class="col-md-6">
-
                                                         <input
-                                                            v-model.trim="staffForm.emergency_contact"
+                                                            v-model="staffForm.emergency_contact"
                                                             class="form-control"
                                                             placeholder="Emergency Contact"
                                                         >
-
                                                     </div>
 
-
                                                     <div class="col-md-6">
-
                                                         <input
-                                                            v-model.trim="staffForm.address"
+                                                            v-model="staffForm.address"
                                                             class="form-control"
                                                             placeholder="Address"
                                                         >
-
                                                     </div>
 
 
                                                     <div class="col-12">
 
-                                                        <button
-                                                            class="btn btn-success"
-                                                        >
+                                                        <button class="btn btn-success">
                                                             Create Staff
                                                         </button>
 
@@ -2938,7 +2774,6 @@ createApp({
                                 </div>
 
 
-
                                 <div class="col-lg-5">
 
                                     <div class="card dashboard-card">
@@ -2951,9 +2786,7 @@ createApp({
 
 
                                             <select
-                                                v-model="
-                                                    assignForm.trek_id
-                                                "
+                                                v-model="assignForm.trek_id"
                                                 class="form-select mb-3"
                                             >
 
@@ -2961,10 +2794,8 @@ createApp({
                                                     Select Trek
                                                 </option>
 
-
                                                 <option
                                                     v-for="trek in treks"
-                                                    :key="trek.id"
                                                     :value="trek.id"
                                                 >
                                                     {{ trek.name }}
@@ -2974,9 +2805,7 @@ createApp({
 
 
                                             <select
-                                                v-model="
-                                                    assignForm.staff_id
-                                                "
+                                                v-model="assignForm.staff_id"
                                                 class="form-select mb-3"
                                             >
 
@@ -2984,12 +2813,8 @@ createApp({
                                                     Select Staff
                                                 </option>
 
-
                                                 <option
-                                                    v-for="
-                                                        person in staff
-                                                    "
-                                                    :key="person.id"
+                                                    v-for="person in staff"
                                                     :value="person.id"
                                                 >
                                                     {{ person.name }}
@@ -3002,7 +2827,7 @@ createApp({
                                                 class="btn btn-primary"
                                                 @click="assignStaff"
                                             >
-                                                Assign Staff
+                                                Assign
                                             </button>
 
                                         </div>
@@ -3014,71 +2839,37 @@ createApp({
                             </div>
 
 
-
-                            <div
-                                class="table-responsive table-container"
-                            >
+                            <div class="table-responsive table-container">
 
                                 <table class="table">
 
                                     <thead>
-
                                         <tr>
-
                                             <th>ID</th>
-
                                             <th>Name</th>
-
                                             <th>Email</th>
-
-                                            <th>Phone</th>
-
                                             <th>Specialization</th>
-
-                                            <th>Assigned Treks</th>
-
+                                            <th>Assigned</th>
                                             <th>Status</th>
-
                                         </tr>
-
                                     </thead>
 
 
                                     <tbody>
 
                                         <tr
-                                            v-for="
-                                                person in staff
-                                            "
+                                            v-for="person in staff"
                                             :key="person.id"
                                         >
 
-                                            <td>
-                                                {{ person.id }}
-                                            </td>
+                                            <td>{{ person.id }}</td>
+
+                                            <td>{{ person.name }}</td>
+
+                                            <td>{{ person.email }}</td>
 
                                             <td>
-                                                {{ person.name }}
-                                            </td>
-
-                                            <td>
-                                                {{ person.email }}
-                                            </td>
-
-                                            <td>
-                                                {{
-                                                    person.phone
-                                                    ||
-                                                    '-'
-                                                }}
-                                            </td>
-
-                                            <td>
-                                                {{
-                                                    person.specialization
-                                                    ||
-                                                    '-'
-                                                }}
+                                                {{ person.specialization || '-' }}
                                             </td>
 
                                             <td>
@@ -3088,24 +2879,18 @@ createApp({
                                             <td>
 
                                                 <span
-                                                    v-if="
-                                                        person.is_blacklisted
-                                                    "
+                                                    v-if="person.is_blacklisted"
                                                     class="badge bg-danger"
                                                 >
                                                     Blacklisted
                                                 </span>
 
-
                                                 <span
-                                                    v-else-if="
-                                                        person.is_active
-                                                    "
+                                                    v-else-if="person.is_active"
                                                     class="badge bg-success"
                                                 >
                                                     Active
                                                 </span>
-
 
                                                 <span
                                                     v-else
@@ -3133,10 +2918,7 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="
-                                currentPage ===
-                                'admin-users'
-                            "
+                            v-else-if="currentPage==='admin-users'"
                         >
 
                             <h2 class="fw-bold mb-4">
@@ -3144,34 +2926,20 @@ createApp({
                             </h2>
 
 
-                            <div
-                                class="table-responsive table-container"
-                            >
+                            <div class="table-responsive table-container">
 
-                                <table
-                                    class="table table-hover"
-                                >
+                                <table class="table">
 
                                     <thead>
-
                                         <tr>
-
                                             <th>ID</th>
-
                                             <th>Name</th>
-
                                             <th>Role</th>
-
                                             <th>Email</th>
-
                                             <th>Active</th>
-
-                                            <th>Blacklist</th>
-
+                                            <th>Blacklisted</th>
                                             <th>Actions</th>
-
                                         </tr>
-
                                     </thead>
 
 
@@ -3182,95 +2950,50 @@ createApp({
                                             :key="user.id"
                                         >
 
+                                            <td>{{ user.id }}</td>
+                                            <td>{{ user.name }}</td>
+                                            <td>{{ user.role }}</td>
+                                            <td>{{ user.email }}</td>
+
                                             <td>
-                                                {{ user.id }}
+                                                {{ user.is_active ? 'Yes' : 'No' }}
                                             </td>
 
                                             <td>
-                                                {{ user.name }}
-                                            </td>
-
-                                            <td>
-                                                {{ user.role }}
-                                            </td>
-
-                                            <td>
-                                                {{ user.email }}
-                                            </td>
-
-                                            <td>
-                                                {{
-                                                    user.is_active
-                                                    ? 'Yes'
-                                                    : 'No'
-                                                }}
-                                            </td>
-
-                                            <td>
-                                                {{
-                                                    user.is_blacklisted
-                                                    ? 'Yes'
-                                                    : 'No'
-                                                }}
+                                                {{ user.is_blacklisted ? 'Yes' : 'No' }}
                                             </td>
 
                                             <td>
 
                                                 <button
-                                                    v-if="
-                                                        user.is_active
-                                                    "
+                                                    v-if="user.is_active"
                                                     class="btn btn-secondary btn-sm me-1"
-                                                    @click="
-                                                        setUserActive(
-                                                            user,
-                                                            false
-                                                        )
-                                                    "
+                                                    @click="setUserActive(user,false)"
                                                 >
                                                     Deactivate
                                                 </button>
 
-
                                                 <button
                                                     v-else
                                                     class="btn btn-success btn-sm me-1"
-                                                    @click="
-                                                        setUserActive(
-                                                            user,
-                                                            true
-                                                        )
-                                                    "
+                                                    @click="setUserActive(user,true)"
                                                 >
                                                     Activate
                                                 </button>
 
 
                                                 <button
-                                                    v-if="
-                                                        !user.is_blacklisted
-                                                    "
+                                                    v-if="!user.is_blacklisted"
                                                     class="btn btn-danger btn-sm"
-                                                    @click="
-                                                        setUserBlacklist(
-                                                            user,
-                                                            true
-                                                        )
-                                                    "
+                                                    @click="setUserBlacklist(user,true)"
                                                 >
                                                     Blacklist
                                                 </button>
 
-
                                                 <button
                                                     v-else
                                                     class="btn btn-warning btn-sm"
-                                                    @click="
-                                                        setUserBlacklist(
-                                                            user,
-                                                            false
-                                                        )
-                                                    "
+                                                    @click="setUserBlacklist(user,false)"
                                                 >
                                                     Remove Blacklist
                                                 </button>
@@ -3294,10 +3017,7 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="
-                                currentPage ===
-                                'admin-bookings'
-                            "
+                            v-else-if="currentPage==='admin-bookings'"
                         >
 
                             <h2 class="fw-bold mb-4">
@@ -3305,45 +3025,30 @@ createApp({
                             </h2>
 
 
-                            <div
-                                class="table-responsive table-container"
-                            >
+                            <div class="table-responsive table-container">
 
                                 <table class="table">
 
                                     <thead>
-
                                         <tr>
-
                                             <th>ID</th>
-
                                             <th>User</th>
-
                                             <th>Trek</th>
-
                                             <th>Date</th>
-
                                             <th>Status</th>
-
                                             <th>Payment</th>
-
                                         </tr>
-
                                     </thead>
 
 
                                     <tbody>
 
                                         <tr
-                                            v-for="
-                                                booking in bookings
-                                            "
+                                            v-for="booking in bookings"
                                             :key="booking.id"
                                         >
 
-                                            <td>
-                                                {{ booking.id }}
-                                            </td>
+                                            <td>{{ booking.id }}</td>
 
                                             <td>
                                                 {{ booking.user_name }}
@@ -3368,17 +3073,13 @@ createApp({
                                         </tr>
 
 
-                                        <tr
-                                            v-if="
-                                                bookings.length === 0
-                                            "
-                                        >
+                                        <tr v-if="bookings.length===0">
 
                                             <td
                                                 colspan="6"
                                                 class="text-center text-muted"
                                             >
-                                                No bookings yet.
+                                                No bookings.
                                             </td>
 
                                         </tr>
@@ -3398,10 +3099,7 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="
-                                currentPage ===
-                                'admin-search'
-                            "
+                            v-else-if="currentPage==='admin-search'"
                         >
 
                             <h2 class="fw-bold">
@@ -3409,23 +3107,18 @@ createApp({
                             </h2>
 
 
-                            <div
-                                class="input-group my-4"
-                            >
+                            <div class="input-group my-4">
 
                                 <input
-                                    v-model.trim="searchQuery"
-                                    @keyup.enter="performSearch"
+                                    v-model="searchQuery"
                                     class="form-control"
-                                    placeholder="Search trek, user or staff..."
+                                    @keyup.enter="performSearch"
+                                    placeholder="Search by name or ID"
                                 >
-
 
                                 <button
                                     class="btn btn-primary"
-                                    @click="
-                                        performSearch
-                                    "
+                                    @click="performSearch"
                                 >
                                     Search
                                 </button>
@@ -3433,86 +3126,61 @@ createApp({
                             </div>
 
 
-                            <h5>
-                                Treks
-                            </h5>
-
+                            <h5>Treks</h5>
 
                             <div
-                                v-for="
-                                    trek in searchResults.treks
-                                "
-                                :key="'t'+trek.id"
+                                v-for="trek in searchResults.treks"
                                 class="card mb-2"
                             >
-
                                 <div class="card-body">
 
-                                    <strong>
-                                        {{ trek.name }}
-                                    </strong>
-
-                                    -
+                                    {{ trek.id }}
+                                    —
+                                    {{ trek.name }}
+                                    —
                                     {{ trek.location }}
 
                                 </div>
-
                             </div>
-
 
 
                             <h5 class="mt-4">
                                 Trekkers
                             </h5>
 
-
                             <div
-                                v-for="
-                                    user in searchResults.users
-                                "
-                                :key="'u'+user.id"
+                                v-for="user in searchResults.users"
                                 class="card mb-2"
                             >
-
                                 <div class="card-body">
 
-                                    <strong>
-                                        {{ user.name }}
-                                    </strong>
-
-                                    -
+                                    {{ user.id }}
+                                    —
+                                    {{ user.name }}
+                                    —
                                     {{ user.email }}
 
                                 </div>
-
                             </div>
-
 
 
                             <h5 class="mt-4">
                                 Staff
                             </h5>
 
-
                             <div
-                                v-for="
-                                    person in searchResults.staff
-                                "
-                                :key="'s'+person.id"
+                                v-for="person in searchResults.staff"
                                 class="card mb-2"
                             >
-
                                 <div class="card-body">
 
-                                    <strong>
-                                        {{ person.name }}
-                                    </strong>
-
-                                    -
+                                    {{ person.id }}
+                                    —
+                                    {{ person.name }}
+                                    —
                                     {{ person.email }}
 
                                 </div>
-
                             </div>
 
                         </div>
@@ -3524,144 +3192,89 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="
-                                currentPage ===
-                                'staff-dashboard'
-                            "
+                            v-else-if="currentPage==='staff-dashboard'"
                         >
 
-                            <h2 class="fw-bold mb-1">
+                            <h2 class="fw-bold">
                                 Trek Staff Dashboard
                             </h2>
 
 
-                            <p class="text-muted mb-4">
-                                Manage your assigned trekking routes.
-                            </p>
+                            <div class="row g-3 mt-3">
 
-
-                            <div class="row g-3">
-
-
-                                <div class="col-md-4 col-lg">
-
+                                <div class="col">
                                     <div class="card dashboard-card">
-
                                         <div class="card-body text-center">
 
                                             <h3>
                                                 {{ staffStats.assigned_treks }}
                                             </h3>
 
-                                            <span class="text-muted">
-                                                Assigned Treks
-                                            </span>
+                                            Assigned Treks
 
                                         </div>
-
                                     </div>
-
                                 </div>
 
 
-                                <div class="col-md-4 col-lg">
-
+                                <div class="col">
                                     <div class="card dashboard-card">
-
                                         <div class="card-body text-center">
 
                                             <h3>
                                                 {{ staffStats.open_treks }}
                                             </h3>
 
-                                            <span class="text-muted">
-                                                Open
-                                            </span>
+                                            Open
 
                                         </div>
-
                                     </div>
-
                                 </div>
 
 
-                                <div class="col-md-4 col-lg">
-
+                                <div class="col">
                                     <div class="card dashboard-card">
-
                                         <div class="card-body text-center">
 
                                             <h3>
                                                 {{ staffStats.ongoing_treks }}
                                             </h3>
 
-                                            <span class="text-muted">
-                                                Ongoing
-                                            </span>
+                                            Ongoing
 
                                         </div>
-
                                     </div>
-
                                 </div>
 
 
-                                <div class="col-md-4 col-lg">
-
+                                <div class="col">
                                     <div class="card dashboard-card">
-
                                         <div class="card-body text-center">
 
                                             <h3>
                                                 {{ staffStats.completed_treks }}
                                             </h3>
 
-                                            <span class="text-muted">
-                                                Completed
-                                            </span>
+                                            Completed
 
                                         </div>
-
                                     </div>
-
                                 </div>
 
 
-                                <div class="col-md-4 col-lg">
-
+                                <div class="col">
                                     <div class="card dashboard-card">
-
                                         <div class="card-body text-center">
 
                                             <h3>
                                                 {{ staffStats.total_participants }}
                                             </h3>
 
-                                            <span class="text-muted">
-                                                Participants
-                                            </span>
+                                            Participants
 
                                         </div>
-
                                     </div>
-
                                 </div>
-
-                            </div>
-
-
-                            <div class="mt-4">
-
-                                <button
-                                    class="btn btn-primary"
-                                    @click="
-                                        navigate(
-                                            'staff-treks'
-                                        )
-                                    "
-                                >
-                                    View My Treks
-                                </button>
 
                             </div>
 
@@ -3670,14 +3283,11 @@ createApp({
 
 
                         <!-- ============================================= -->
-                        <!-- STAFF MY TREKS -->
+                        <!-- STAFF TREKS -->
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="
-                                currentPage ===
-                                'staff-treks'
-                            "
+                            v-else-if="currentPage==='staff-treks'"
                         >
 
                             <h2 class="fw-bold">
@@ -3685,159 +3295,60 @@ createApp({
                             </h2>
 
 
-                            <p class="text-muted">
-                                Only treks assigned to you are shown here.
-                            </p>
-
-
                             <div class="row g-4 mt-2">
 
-
                                 <div
-                                    v-for="
-                                        trek in staffTreks
-                                    "
+                                    v-for="trek in staffTreks"
                                     :key="trek.id"
                                     class="col-lg-6"
                                 >
 
-                                    <div class="card trek-card">
+                                    <div class="card dashboard-card">
 
                                         <div class="card-body">
 
+                                            <h4>
+                                                {{ trek.name }}
+                                            </h4>
 
-                                            <div
-                                                class="d-flex justify-content-between align-items-start"
-                                            >
-
-                                                <div>
-
-                                                    <h4>
-                                                        {{ trek.name }}
-                                                    </h4>
-
-                                                    <p class="text-muted">
-                                                        {{ trek.location }}
-                                                    </p>
-
-                                                </div>
+                                            <p class="text-muted">
+                                                {{ trek.location }}
+                                            </p>
 
 
-                                                <span
-                                                    class="badge bg-secondary"
-                                                >
-                                                    {{ trek.status }}
-                                                </span>
-
-                                            </div>
-
-
-                                            <hr>
-
-
-                                            <div class="row">
-
-
-                                                <div class="col-6">
-
-                                                    <strong>
-                                                        Difficulty
-                                                    </strong>
-
-                                                    <p>
-                                                        {{ trek.difficulty }}
-                                                    </p>
-
-                                                </div>
-
-
-                                                <div class="col-6">
-
-                                                    <strong>
-                                                        Duration
-                                                    </strong>
-
-                                                    <p>
-                                                        {{ trek.duration }}
-                                                        days
-                                                    </p>
-
-                                                </div>
-
-
-                                                <div class="col-6">
-
-                                                    <strong>
-                                                        Slots
-                                                    </strong>
-
-                                                    <p>
-                                                        {{ trek.available_slots }}
-                                                        /
-                                                        {{ trek.total_slots }}
-                                                    </p>
-
-                                                </div>
-
-
-                                                <div class="col-6">
-
-                                                    <strong>
-                                                        Participants
-                                                    </strong>
-
-                                                    <p>
-                                                        {{ trek.participant_count }}
-                                                    </p>
-
-                                                </div>
-
-                                            </div>
-
-
-                                            <p
-                                                v-if="
-                                                    trek.start_date
-                                                "
-                                            >
-
+                                            <p>
+                                                Status:
                                                 <strong>
-                                                    Dates:
+                                                    {{ trek.status }}
                                                 </strong>
+                                            </p>
 
-                                                {{ trek.start_date }}
 
-                                                <span
-                                                    v-if="
-                                                        trek.end_date
-                                                    "
-                                                >
-                                                    to
-                                                    {{ trek.end_date }}
-                                                </span>
+                                            <p>
+                                                Slots:
+                                                {{ trek.available_slots }}
+                                                /
+                                                {{ trek.total_slots }}
+                                            </p>
 
+
+                                            <p>
+                                                Participants:
+                                                {{ trek.participant_count }}
                                             </p>
 
 
                                             <button
                                                 class="btn btn-primary me-2"
-                                                @click="
-                                                    selectStaffTrek(
-                                                        trek
-                                                    )
-                                                "
+                                                @click="selectStaffTrek(trek)"
                                             >
-                                                Manage Trek
+                                                Manage
                                             </button>
 
 
                                             <button
                                                 class="btn btn-outline-secondary"
-                                                @click="
-                                                    viewTrekParticipants(
-                                                        trek
-                                                    )
-                                                "
+                                                @click="viewTrekParticipants(trek)"
                                             >
                                                 Participants
                                             </button>
@@ -3849,20 +3360,11 @@ createApp({
                                 </div>
 
 
-
                                 <div
-                                    v-if="
-                                        staffTreks.length === 0
-                                    "
-                                    class="col-12"
+                                    v-if="staffTreks.length===0"
+                                    class="alert alert-info"
                                 >
-
-                                    <div
-                                        class="alert alert-info"
-                                    >
-                                        No treks have been assigned to you.
-                                    </div>
-
+                                    No assigned treks.
                                 </div>
 
                             </div>
@@ -3876,50 +3378,28 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="
-                                currentPage ===
-                                'staff-manage-trek'
-                            "
+                            v-else-if="currentPage==='staff-manage-trek'"
                         >
 
                             <button
                                 class="btn btn-outline-secondary mb-3"
-                                @click="
-                                    navigate(
-                                        'staff-treks'
-                                    )
-                                "
+                                @click="navigate('staff-treks')"
                             >
-                                ← Back to My Treks
+                                ← Back
                             </button>
 
 
-                            <div
-                                v-if="
-                                    selectedStaffTrek
-                                "
-                            >
+                            <div v-if="selectedStaffTrek">
 
-                                <h2 class="fw-bold">
-                                    Manage Trek
-                                </h2>
-
-
-                                <p class="text-muted">
-
+                                <h2>
                                     {{ selectedStaffTrek.name }}
-
-                                    —
-
-                                    {{ selectedStaffTrek.location }}
-
-                                </p>
+                                </h2>
 
 
                                 <div class="row g-4">
 
 
-                                    <div class="col-lg-6">
+                                    <div class="col-md-6">
 
                                         <div class="card dashboard-card">
 
@@ -3929,81 +3409,26 @@ createApp({
                                                     Trek Information
                                                 </h5>
 
-                                                <hr>
-
-
                                                 <p>
-
-                                                    <strong>
-                                                        ID:
-                                                    </strong>
-
-                                                    {{ selectedStaffTrek.id }}
-
+                                                    Location:
+                                                    {{ selectedStaffTrek.location }}
                                                 </p>
 
-
                                                 <p>
-
-                                                    <strong>
-                                                        Difficulty:
-                                                    </strong>
-
+                                                    Difficulty:
                                                     {{ selectedStaffTrek.difficulty }}
-
                                                 </p>
 
-
                                                 <p>
-
-                                                    <strong>
-                                                        Duration:
-                                                    </strong>
-
-                                                    {{ selectedStaffTrek.duration }}
-                                                    days
-
+                                                    Status:
+                                                    {{ selectedStaffTrek.status }}
                                                 </p>
 
-
                                                 <p>
-
-                                                    <strong>
-                                                        Status:
-                                                    </strong>
-
-                                                    <span
-                                                        class="badge bg-primary"
-                                                    >
-                                                        {{ selectedStaffTrek.status }}
-                                                    </span>
-
-                                                </p>
-
-
-                                                <p>
-
-                                                    <strong>
-                                                        Available Slots:
-                                                    </strong>
-
+                                                    Slots:
                                                     {{ selectedStaffTrek.available_slots }}
-
                                                     /
-
                                                     {{ selectedStaffTrek.total_slots }}
-
-                                                </p>
-
-
-                                                <p>
-
-                                                    <strong>
-                                                        Participants:
-                                                    </strong>
-
-                                                    {{ selectedStaffTrek.participant_count }}
-
                                                 </p>
 
                                             </div>
@@ -4013,43 +3438,25 @@ createApp({
                                     </div>
 
 
+                                    <div class="col-md-6">
 
-                                    <div class="col-lg-6">
-
-
-                                        <div
-                                            class="card dashboard-card mb-4"
-                                        >
+                                        <div class="card dashboard-card mb-3">
 
                                             <div class="card-body">
 
                                                 <h5>
-                                                    Update Trek Slots
+                                                    Slots
                                                 </h5>
 
-
-                                                <label
-                                                    class="form-label mt-2"
-                                                >
-                                                    Total Slots
-                                                </label>
-
-
                                                 <input
-                                                    v-model.number="
-                                                        staffSlotForm.total_slots
-                                                    "
+                                                    v-model.number="staffSlotForm.total_slots"
                                                     type="number"
-                                                    min="1"
-                                                    class="form-control mb-3"
+                                                    class="form-control mb-2"
                                                 >
-
 
                                                 <button
                                                     class="btn btn-primary"
-                                                    @click="
-                                                        updateStaffSlots
-                                                    "
+                                                    @click="updateStaffSlots"
                                                 >
                                                     Update Slots
                                                 </button>
@@ -4059,78 +3466,42 @@ createApp({
                                         </div>
 
 
-
-                                        <div
-                                            class="card dashboard-card"
-                                        >
+                                        <div class="card dashboard-card">
 
                                             <div class="card-body">
 
                                                 <h5>
-                                                    Trek Status
+                                                    Status
                                                 </h5>
 
 
-                                                <div
-                                                    class="d-flex flex-wrap gap-2 mt-3"
+                                                <button
+                                                    class="btn btn-success me-1 mb-1"
+                                                    @click="updateStaffStatus('Open')"
                                                 >
+                                                    Open
+                                                </button>
 
-                                                    <button
-                                                        class="btn btn-success"
-                                                        @click="
-                                                            updateStaffStatus(
-                                                                'Open'
-                                                            )
-                                                        "
-                                                    >
-                                                        Open
-                                                    </button>
-
-
-                                                    <button
-                                                        class="btn btn-secondary"
-                                                        @click="
-                                                            updateStaffStatus(
-                                                                'Closed'
-                                                            )
-                                                        "
-                                                    >
-                                                        Close
-                                                    </button>
-
-
-                                                    <button
-                                                        class="btn btn-warning"
-                                                        @click="
-                                                            updateStaffStatus(
-                                                                'Ongoing'
-                                                            )
-                                                        "
-                                                    >
-                                                        Start / Ongoing
-                                                    </button>
-
-
-                                                    <button
-                                                        class="btn btn-primary"
-                                                        @click="
-                                                            updateStaffStatus(
-                                                                'Completed'
-                                                            )
-                                                        "
-                                                    >
-                                                        Complete
-                                                    </button>
-
-                                                </div>
-
-
-                                                <div
-                                                    class="alert alert-warning mt-3 mb-0"
+                                                <button
+                                                    class="btn btn-secondary me-1 mb-1"
+                                                    @click="updateStaffStatus('Closed')"
                                                 >
-                                                    Completing a trek will mark active
-                                                    bookings as completed.
-                                                </div>
+                                                    Close
+                                                </button>
+
+                                                <button
+                                                    class="btn btn-warning me-1 mb-1"
+                                                    @click="updateStaffStatus('Ongoing')"
+                                                >
+                                                    Ongoing
+                                                </button>
+
+                                                <button
+                                                    class="btn btn-primary mb-1"
+                                                    @click="updateStaffStatus('Completed')"
+                                                >
+                                                    Complete
+                                                </button>
 
                                             </div>
 
@@ -4151,130 +3522,56 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="
-                                currentPage ===
-                                'staff-participants'
-                            "
+                            v-else-if="currentPage==='staff-participants'"
                         >
 
                             <h2 class="fw-bold">
-                                Trek Participants
+                                Participants
                             </h2>
 
 
-                            <p class="text-muted">
+                            <div class="table-responsive table-container mt-3">
 
-                                {{
-                                    selectedStaffTrek
-                                    ? 'Participants for ' +
-                                      selectedStaffTrek.name
-                                    : 'Participants registered for your assigned treks.'
-                                }}
-
-                            </p>
-
-
-                            <div
-                                class="table-responsive table-container mt-4"
-                            >
-
-                                <table
-                                    class="table table-hover align-middle"
-                                >
+                                <table class="table">
 
                                     <thead>
-
                                         <tr>
-
-                                            <th>
-                                                Booking
-                                            </th>
-
-                                            <th>
-                                                Participant
-                                            </th>
-
-                                            <th>
-                                                Email
-                                            </th>
-
-                                            <th>
-                                                Phone
-                                            </th>
-
-                                            <th>
-                                                Trek
-                                            </th>
-
-                                            <th>
-                                                Booking Status
-                                            </th>
-
-                                            <th>
-                                                Payment
-                                            </th>
-
+                                            <th>Booking</th>
+                                            <th>Name</th>
+                                            <th>Email</th>
+                                            <th>Phone</th>
+                                            <th>Trek</th>
+                                            <th>Status</th>
                                         </tr>
-
                                     </thead>
 
 
                                     <tbody>
 
                                         <tr
-                                            v-for="
-                                                participant
-                                                in staffParticipants
-                                            "
-                                            :key="
-                                                participant.booking_id
-                                            "
+                                            v-for="p in staffParticipants"
+                                            :key="p.booking_id"
                                         >
 
                                             <td>
-                                                #{{ participant.booking_id }}
+                                                {{ p.booking_id }}
                                             </td>
 
-
                                             <td>
-
-                                                {{
-                                                    participant.user_name
-                                                    ||
-                                                    participant.name
-                                                }}
-
+                                                {{ p.user_name || p.name }}
                                             </td>
 
-
                                             <td>
-
-                                                {{
-                                                    participant.user_email
-                                                    ||
-                                                    participant.email
-                                                }}
-
+                                                {{ p.user_email || p.email }}
                                             </td>
 
-
                                             <td>
-
-                                                {{
-                                                    participant.user_phone
-                                                    ||
-                                                    participant.phone
-                                                    ||
-                                                    '-'
-                                                }}
-
+                                                {{ p.user_phone || p.phone || '-' }}
                                             </td>
 
-
                                             <td>
-
                                                 {{
-                                                    participant.trek_name
+                                                    p.trek_name
                                                     ||
                                                     (
                                                         selectedStaffTrek
@@ -4282,43 +3579,24 @@ createApp({
                                                         : '-'
                                                     )
                                                 }}
-
                                             </td>
 
-
                                             <td>
-
-                                                <span
-                                                    class="badge bg-secondary"
-                                                >
-                                                    {{
-                                                        participant.booking_status
-                                                    }}
-                                                </span>
-
-                                            </td>
-
-
-                                            <td>
-                                                {{ participant.payment_status }}
+                                                {{ p.booking_status }}
                                             </td>
 
                                         </tr>
 
 
                                         <tr
-                                            v-if="
-                                                staffParticipants.length === 0
-                                            "
+                                            v-if="staffParticipants.length===0"
                                         >
-
                                             <td
-                                                colspan="7"
-                                                class="text-center text-muted py-4"
+                                                colspan="6"
+                                                class="text-center text-muted"
                                             >
-                                                No participant records found.
+                                                No participants.
                                             </td>
-
                                         </tr>
 
                                     </tbody>
@@ -4336,138 +3614,532 @@ createApp({
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="
-                                currentPage ===
-                                'staff-profile'
-                            "
+                            v-else-if="currentPage==='staff-profile'"
                         >
 
-                            <h2 class="fw-bold">
-                                My Profile
+                            <h2>
+                                Staff Profile
                             </h2>
 
 
                             <div
-                                v-if="
-                                    staffProfile
-                                "
-                                class="card dashboard-card mt-4"
+                                v-if="staffProfile"
+                                class="card dashboard-card mt-3"
                             >
 
                                 <div class="card-body">
 
-                                    <div class="row g-4">
+                                    <p>
+                                        <strong>Name:</strong>
+                                        {{ staffProfile.name }}
+                                    </p>
+
+                                    <p>
+                                        <strong>Email:</strong>
+                                        {{ staffProfile.email }}
+                                    </p>
+
+                                    <p>
+                                        <strong>Phone:</strong>
+                                        {{ staffProfile.phone || '-' }}
+                                    </p>
+
+                                    <p>
+                                        <strong>Experience:</strong>
+                                        {{ staffProfile.experience || '-' }}
+                                    </p>
+
+                                    <p>
+                                        <strong>Specialization:</strong>
+                                        {{ staffProfile.specialization || '-' }}
+                                    </p>
+
+                                    <p>
+                                        <strong>Emergency:</strong>
+                                        {{ staffProfile.emergency_contact || '-' }}
+                                    </p>
+
+                                    <p>
+                                        <strong>Address:</strong>
+                                        {{ staffProfile.address || '-' }}
+                                    </p>
+
+                                </div>
+
+                            </div>
+
+                        </div>
 
 
-                                        <div class="col-md-6">
 
-                                            <label class="text-muted">
-                                                Name
-                                            </label>
+                        <!-- ============================================= -->
+                        <!-- TREKKER DASHBOARD -->
+                        <!-- ============================================= -->
 
-                                            <h5>
-                                                {{ staffProfile.name }}
-                                            </h5>
+                        <div
+                            v-else-if="currentPage==='trekker-dashboard'"
+                        >
+
+                            <h2 class="fw-bold">
+                                Trekker Dashboard
+                            </h2>
+
+                            <p class="text-muted">
+                                Welcome {{ currentUser.name }}
+                            </p>
+
+
+                            <div class="row g-3 mt-2">
+
+
+                                <div class="col-md-3">
+
+                                    <div class="card dashboard-card">
+
+                                        <div class="card-body text-center">
+
+                                            <h2>
+                                                {{ trekkerStats.available_treks }}
+                                            </h2>
+
+                                            <span>
+                                                Available Treks
+                                            </span>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+
+                                <div class="col-md-3">
+
+                                    <div class="card dashboard-card">
+
+                                        <div class="card-body text-center">
+
+                                            <h2>
+                                                {{ trekkerStats.active_bookings }}
+                                            </h2>
+
+                                            <span>
+                                                Active Bookings
+                                            </span>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+
+                                <div class="col-md-3">
+
+                                    <div class="card dashboard-card">
+
+                                        <div class="card-body text-center">
+
+                                            <h2>
+                                                {{ trekkerStats.completed_treks }}
+                                            </h2>
+
+                                            <span>
+                                                Completed
+                                            </span>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+
+                                <div class="col-md-3">
+
+                                    <div class="card dashboard-card">
+
+                                        <div class="card-body text-center">
+
+                                            <h2>
+                                                {{ trekkerStats.cancelled_bookings }}
+                                            </h2>
+
+                                            <span>
+                                                Cancelled
+                                            </span>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+
+                            <button
+                                class="btn btn-primary mt-4"
+                                @click="navigate('trekker-treks')"
+                            >
+                                Browse Available Treks
+                            </button>
+
+                        </div>
+
+
+
+                        <!-- ============================================= -->
+                        <!-- TREKKER BROWSE TREKS -->
+                        <!-- ============================================= -->
+
+                        <div
+                            v-else-if="currentPage==='trekker-treks'"
+                        >
+
+                            <h2 class="fw-bold">
+                                Browse Treks
+                            </h2>
+
+                            <p class="text-muted">
+                                Only Open treks are available for booking.
+                            </p>
+
+
+                            <!-- FILTERS -->
+
+                            <div class="card dashboard-card my-4">
+
+                                <div class="card-body">
+
+                                    <h5>
+                                        Search & Filters
+                                    </h5>
+
+
+                                    <div class="row g-3">
+
+
+                                        <div class="col-md-3">
+
+                                            <input
+                                                v-model="trekFilters.search"
+                                                class="form-control"
+                                                placeholder="Search trek..."
+                                                @keyup.enter="loadAvailableTreks"
+                                            >
 
                                         </div>
 
 
-                                        <div class="col-md-6">
+                                        <div class="col-md-3">
 
-                                            <label class="text-muted">
-                                                Email
-                                            </label>
+                                            <select
+                                                v-model="trekFilters.difficulty"
+                                                class="form-select"
+                                            >
 
-                                            <h5>
-                                                {{ staffProfile.email }}
-                                            </h5>
+                                                <option value="">
+                                                    All Difficulties
+                                                </option>
 
-                                        </div>
+                                                <option value="Easy">
+                                                    Easy
+                                                </option>
 
+                                                <option value="Moderate">
+                                                    Moderate
+                                                </option>
 
-                                        <div class="col-md-6">
+                                                <option value="Hard">
+                                                    Hard
+                                                </option>
 
-                                            <label class="text-muted">
-                                                Phone
-                                            </label>
-
-                                            <h5>
-                                                {{
-                                                    staffProfile.phone
-                                                    ||
-                                                    '-'
-                                                }}
-                                            </h5>
+                                            </select>
 
                                         </div>
 
 
-                                        <div class="col-md-6">
+                                        <div class="col-md-3">
 
-                                            <label class="text-muted">
-                                                Experience
-                                            </label>
-
-                                            <h5>
-                                                {{
-                                                    staffProfile.experience
-                                                    ||
-                                                    '-'
-                                                }}
-                                            </h5>
+                                            <input
+                                                v-model="trekFilters.location"
+                                                class="form-control"
+                                                placeholder="Location"
+                                            >
 
                                         </div>
 
 
-                                        <div class="col-md-6">
+                                        <div class="col-md-3">
 
-                                            <label class="text-muted">
-                                                Specialization
-                                            </label>
-
-                                            <h5>
-                                                {{
-                                                    staffProfile.specialization
-                                                    ||
-                                                    '-'
-                                                }}
-                                            </h5>
-
-                                        </div>
-
-
-                                        <div class="col-md-6">
-
-                                            <label class="text-muted">
-                                                Emergency Contact
-                                            </label>
-
-                                            <h5>
-                                                {{
-                                                    staffProfile.emergency_contact
-                                                    ||
-                                                    '-'
-                                                }}
-                                            </h5>
+                                            <input
+                                                v-model="trekFilters.duration"
+                                                type="number"
+                                                min="1"
+                                                class="form-control"
+                                                placeholder="Max days"
+                                            >
 
                                         </div>
 
 
                                         <div class="col-12">
 
-                                            <label class="text-muted">
-                                                Address
-                                            </label>
+                                            <button
+                                                class="btn btn-primary me-2"
+                                                @click="loadAvailableTreks"
+                                            >
+                                                Apply Filters
+                                            </button>
 
-                                            <h5>
-                                                {{
-                                                    staffProfile.address
-                                                    ||
-                                                    '-'
-                                                }}
-                                            </h5>
+
+                                            <button
+                                                class="btn btn-outline-secondary"
+                                                @click="clearTrekFilters"
+                                            >
+                                                Clear
+                                            </button>
 
                                         </div>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+
+
+                            <!-- TREKS -->
+
+                            <div class="row g-4">
+
+
+                                <div
+                                    v-for="trek in availableTreks"
+                                    :key="trek.id"
+                                    class="col-lg-6"
+                                >
+
+                                    <div class="card dashboard-card h-100">
+
+                                        <div class="card-body">
+
+                                            <div
+                                                class="d-flex justify-content-between"
+                                            >
+
+                                                <div>
+
+                                                    <h4>
+                                                        {{ trek.name }}
+                                                    </h4>
+
+                                                    <p class="text-muted">
+                                                        {{ trek.location }}
+                                                    </p>
+
+                                                </div>
+
+
+                                                <span
+                                                    class="badge bg-success align-self-start"
+                                                >
+                                                    {{ trek.status }}
+                                                </span>
+
+                                            </div>
+
+
+                                            <hr>
+
+
+                                            <p>
+                                                <strong>Difficulty:</strong>
+                                                {{ trek.difficulty }}
+                                            </p>
+
+
+                                            <p>
+                                                <strong>Duration:</strong>
+                                                {{ trek.duration }}
+                                                days
+                                            </p>
+
+
+                                            <p>
+                                                <strong>Available Slots:</strong>
+                                                {{ trek.available_slots }}
+                                                /
+                                                {{ trek.total_slots }}
+                                            </p>
+
+
+                                            <p>
+                                                <strong>Start:</strong>
+                                                {{ trek.start_date || '-' }}
+                                            </p>
+
+
+                                            <p>
+                                                <strong>Staff:</strong>
+                                                {{ trek.assigned_staff || 'Not Assigned' }}
+                                            </p>
+
+
+                                            <button
+                                                class="btn btn-outline-primary me-2"
+                                                @click="viewTrekDetails(trek)"
+                                            >
+                                                View Details
+                                            </button>
+
+
+                                            <button
+                                                class="btn btn-success"
+                                                :disabled="trek.available_slots <= 0"
+                                                @click="bookTrek(trek)"
+                                            >
+                                                {{
+                                                    trek.available_slots > 0
+                                                    ? 'Book Trek'
+                                                    : 'Full'
+                                                }}
+                                            </button>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+
+                                <div
+                                    v-if="availableTreks.length===0"
+                                    class="col-12"
+                                >
+
+                                    <div class="alert alert-info">
+                                        No matching Open treks found.
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- ============================================= -->
+                        <!-- TREK DETAILS -->
+                        <!-- ============================================= -->
+
+                        <div
+                            v-else-if="currentPage==='trekker-trek-details'"
+                        >
+
+                            <button
+                                class="btn btn-outline-secondary mb-3"
+                                @click="navigate('trekker-treks')"
+                            >
+                                ← Back to Treks
+                            </button>
+
+
+                            <div v-if="selectedTrek">
+
+                                <div class="card dashboard-card">
+
+                                    <div class="card-body">
+
+                                        <h2>
+                                            {{ selectedTrek.name }}
+                                        </h2>
+
+
+                                        <p class="text-muted">
+                                            {{ selectedTrek.location }}
+                                        </p>
+
+
+                                        <hr>
+
+
+                                        <div class="row">
+
+                                            <div class="col-md-6">
+
+                                                <p>
+                                                    <strong>Difficulty:</strong>
+                                                    {{ selectedTrek.difficulty }}
+                                                </p>
+
+                                                <p>
+                                                    <strong>Duration:</strong>
+                                                    {{ selectedTrek.duration }}
+                                                    days
+                                                </p>
+
+                                                <p>
+                                                    <strong>Status:</strong>
+                                                    {{ selectedTrek.status }}
+                                                </p>
+
+                                                <p>
+                                                    <strong>Slots:</strong>
+                                                    {{ selectedTrek.available_slots }}
+                                                    /
+                                                    {{ selectedTrek.total_slots }}
+                                                </p>
+
+                                            </div>
+
+
+                                            <div class="col-md-6">
+
+                                                <p>
+                                                    <strong>Start Date:</strong>
+                                                    {{ selectedTrek.start_date || '-' }}
+                                                </p>
+
+                                                <p>
+                                                    <strong>End Date:</strong>
+                                                    {{ selectedTrek.end_date || '-' }}
+                                                </p>
+
+                                                <p>
+                                                    <strong>Assigned Staff:</strong>
+                                                    {{ selectedTrek.assigned_staff || 'Not Assigned' }}
+                                                </p>
+
+                                            </div>
+
+                                        </div>
+
+
+                                        <h5>
+                                            Description
+                                        </h5>
+
+                                        <p>
+                                            {{ selectedTrek.description || 'No description provided.' }}
+                                        </p>
+
+
+                                        <button
+                                            v-if="selectedTrek.status==='Open'"
+                                            class="btn btn-success"
+                                            :disabled="selectedTrek.available_slots <= 0"
+                                            @click="bookTrek(selectedTrek)"
+                                        >
+                                            {{
+                                                selectedTrek.available_slots > 0
+                                                ? 'Book This Trek'
+                                                : 'Trek Full'
+                                            }}
+                                        </button>
 
                                     </div>
 
@@ -4480,23 +4152,338 @@ createApp({
 
 
                         <!-- ============================================= -->
-                        <!-- TREKKER PLACEHOLDER -->
+                        <!-- MY BOOKINGS -->
                         <!-- ============================================= -->
 
                         <div
-                            v-else-if="
-                                currentPage ===
-                                'trekker-dashboard'
-                            "
+                            v-else-if="currentPage==='trekker-bookings'"
                         >
 
                             <h2 class="fw-bold">
-                                Trekker Dashboard
+                                My Bookings
                             </h2>
 
                             <p class="text-muted">
-                                Trek booking features will be added next.
+                                Your currently active trek bookings.
                             </p>
+
+
+                            <div class="row g-4 mt-2">
+
+
+                                <div
+                                    v-for="booking in trekkerBookings"
+                                    :key="booking.id"
+                                    class="col-lg-6"
+                                >
+
+                                    <div class="card dashboard-card">
+
+                                        <div class="card-body">
+
+                                            <h4>
+                                                {{ booking.trek_name }}
+                                            </h4>
+
+
+                                            <p class="text-muted">
+                                                {{ booking.location }}
+                                            </p>
+
+
+                                            <p>
+                                                <strong>Booking ID:</strong>
+                                                #{{ booking.id }}
+                                            </p>
+
+
+                                            <p>
+                                                <strong>Booking Status:</strong>
+
+                                                <span class="badge bg-success">
+                                                    {{ booking.booking_status }}
+                                                </span>
+                                            </p>
+
+
+                                            <p>
+                                                <strong>Trek Status:</strong>
+                                                {{ booking.trek_status }}
+                                            </p>
+
+
+                                            <p>
+                                                <strong>Difficulty:</strong>
+                                                {{ booking.difficulty }}
+                                            </p>
+
+
+                                            <p>
+                                                <strong>Start:</strong>
+                                                {{ booking.start_date || '-' }}
+                                            </p>
+
+
+                                            <p>
+                                                <strong>Payment:</strong>
+                                                {{ booking.payment_status }}
+                                            </p>
+
+
+                                            <button
+                                                v-if="
+                                                    booking.trek_status !== 'Ongoing'
+                                                    &&
+                                                    booking.trek_status !== 'Completed'
+                                                "
+                                                class="btn btn-danger"
+                                                @click="cancelBooking(booking)"
+                                            >
+                                                Cancel Booking
+                                            </button>
+
+
+                                            <span
+                                                v-else
+                                                class="text-muted"
+                                            >
+                                                Cancellation unavailable.
+                                            </span>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+
+                                <div
+                                    v-if="trekkerBookings.length===0"
+                                    class="col-12"
+                                >
+
+                                    <div class="alert alert-info">
+
+                                        You currently have no active bookings.
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- ============================================= -->
+                        <!-- TREKKER HISTORY -->
+                        <!-- ============================================= -->
+
+                        <div
+                            v-else-if="currentPage==='trekker-history'"
+                        >
+
+                            <h2 class="fw-bold">
+                                Trekking History
+                            </h2>
+
+
+                            <div
+                                class="table-responsive table-container mt-4"
+                            >
+
+                                <table class="table table-hover">
+
+                                    <thead>
+
+                                        <tr>
+                                            <th>Booking</th>
+                                            <th>Trek</th>
+                                            <th>Location</th>
+                                            <th>Booking Date</th>
+                                            <th>Booking Status</th>
+                                            <th>Trek Status</th>
+                                            <th>Payment</th>
+                                        </tr>
+
+                                    </thead>
+
+
+                                    <tbody>
+
+                                        <tr
+                                            v-for="item in trekkerHistory"
+                                            :key="item.id"
+                                        >
+
+                                            <td>
+                                                #{{ item.id }}
+                                            </td>
+
+                                            <td>
+                                                {{ item.trek_name }}
+                                            </td>
+
+                                            <td>
+                                                {{ item.location }}
+                                            </td>
+
+                                            <td>
+                                                {{ item.booking_date }}
+                                            </td>
+
+                                            <td>
+
+                                                <span
+                                                    class="badge"
+                                                    :class="{
+                                                        'bg-success':
+                                                            item.booking_status==='Booked',
+
+                                                        'bg-danger':
+                                                            item.booking_status==='Cancelled',
+
+                                                        'bg-primary':
+                                                            item.booking_status==='Completed'
+                                                    }"
+                                                >
+                                                    {{ item.booking_status }}
+                                                </span>
+
+                                            </td>
+
+                                            <td>
+                                                {{ item.trek_status }}
+                                            </td>
+
+                                            <td>
+                                                {{ item.payment_status }}
+                                            </td>
+
+                                        </tr>
+
+
+                                        <tr
+                                            v-if="trekkerHistory.length===0"
+                                        >
+
+                                            <td
+                                                colspan="7"
+                                                class="text-center text-muted"
+                                            >
+                                                No booking history.
+                                            </td>
+
+                                        </tr>
+
+                                    </tbody>
+
+                                </table>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- ============================================= -->
+                        <!-- TREKKER PROFILE -->
+                        <!-- ============================================= -->
+
+                        <div
+                            v-else-if="currentPage==='trekker-profile'"
+                        >
+
+                            <h2 class="fw-bold">
+                                My Profile
+                            </h2>
+
+
+                            <div
+                                v-if="trekkerProfile"
+                                class="card dashboard-card mt-4"
+                            >
+
+                                <div class="card-body">
+
+                                    <div class="row g-3">
+
+
+                                        <div class="col-md-6">
+
+                                            <label class="form-label">
+                                                Name
+                                            </label>
+
+                                            <input
+                                                v-model="trekkerProfileForm.name"
+                                                class="form-control"
+                                            >
+
+                                        </div>
+
+
+                                        <div class="col-md-6">
+
+                                            <label class="form-label">
+                                                Phone
+                                            </label>
+
+                                            <input
+                                                v-model="trekkerProfileForm.phone"
+                                                class="form-control"
+                                            >
+
+                                        </div>
+
+
+                                        <div class="col-md-6">
+
+                                            <label class="form-label">
+                                                Email
+                                            </label>
+
+                                            <input
+                                                :value="trekkerProfile.email"
+                                                class="form-control"
+                                                disabled
+                                            >
+
+                                        </div>
+
+
+                                        <div class="col-md-6">
+
+                                            <label class="form-label">
+                                                Role
+                                            </label>
+
+                                            <input
+                                                :value="trekkerProfile.role"
+                                                class="form-control"
+                                                disabled
+                                            >
+
+                                        </div>
+
+
+                                        <div class="col-12">
+
+                                            <button
+                                                class="btn btn-primary"
+                                                @click="updateTrekkerProfile"
+                                            >
+                                                Save Profile
+                                            </button>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
 
                         </div>
 
@@ -4510,6 +4497,7 @@ createApp({
         </div>
 
     </div>
+
     `
 
 }).mount("#app");
